@@ -1,0 +1,193 @@
+---
+title: "Data Science Lecture"
+author: "Simon Anders"
+date: "14 October 2019"
+output: html_document
+---
+
+## 1. Vorlesung (14.10.)
+
+Sorry nochmals für den chaotischen Anfang der Vorlesung. Das mein Laptop so unerwartet den defekt war und ich meine Slides nicht zeigen konnte, hat mich doch sehr aus dem Konzept gebracht. Nächste Woche wird alles klarer und strukturierter werden.
+
+### Inhalte der Vorlesung
+
+In den nächsten Wochen werden wir lernen, mit biologischen und anderebn Daten zu arbeiten:
+- Rohdaten in eine Form bringen, damit wir damit arbeiten können ("data wrangling")
+- Daten plotten ("data visualization")
+- Plots und Analysen durchprobieren, um die daten zu erforschen ("exploratory data analysis, EDA")
+- Daten und Plots interpretieren
+- statistisch signifankte Ergebnisse von Zufällen unterscheiden ("inferentielle Statistik")
+
+### R, Tidyverse und RStudio
+
+Wir verwenden die statistische Programmierumgebung "R". R is eine Programmiersprache, für die es verschiedene Bedienungs-Oberflächen gibt. Wir verwenden "RStudio". R ist sehr komplex; wir verwenden daher nur einen Teil von R, das sogenannte "Tidyverse". Eine gute Einführung zu Tidyverse ist:
+
+| Garrett Grolemund and Hadley Wickham: *R for Data Science*
+| online: http://r4ds.had.co.nz/
+| gedruckt: O'Reilly, 2017; ISBN-13: 978-1491910399
+
+Um zu starten, laden wir zunächst in RStudio das Tidyverse, indem wir diesen Befehl eingeben:
+
+```{r}
+library( tidyverse )
+```
+(Die daraufhin angezeigten Meldungen sind unwichtig.)
+
+
+### Beispieldaten für heute
+
+Unsere heutigen Beispieldaten stammen von der [NHANES-Studie](https://www.cdc.gov/nchs/nhanes/index.htm) des Center for Disease Control and Prevention (CDC). Wir verwdnden die Daten von 2015-2016 (Continuous NHANES, data set "I"), and zwar den demographischen Datensatz  ("DEMO") und den "and the "Body Measures"-Datensatz ("BMX"). Wir laden erste die beiden Dateien herunter: [`DEMO_I.XPT`](https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/DEMO_I.XPT) und [`BMX_I.XPT`](https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BMX_I.XPT). (Beide Links können angeklickt werden.) Eine ausführliche Beschreibung  findet sich im ["study overview"](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/overview.aspx?BeginYear=2015) und in der Dokumentation [zu DEMO](https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/DEMO_I.htm) und [zu BMX](https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BMX_I.htm).
+
+### Laden der Daten in RStudio
+
+Der folgende Befehl, eingetippt in RStudio, lädt die Datei "DEMO_I.XPT". Damit das funktioniert, muss man vorher im Menü "Session" / "Set workling directory" das Verzeichnis wählen, in dem man die heruntergelandene Datei abgelegt hat. Die Funktion `read_xpt` ist eine spezielle Funktion, die das von NHANES verwendete "XPT"-Datenformat lesen kann.
+
+```{r}
+haven::read_xpt( "DEMO_I.XPT" )
+```
+
+R antwortet auf den Befehl damit, dass es den Anfang der eingelesenen Tabelle ausgibt, die Tabelle aber gleich wieder vergisst. Um die Tabelle zu speichern, muss man sie einer Variablen (d.h., einem Speicherort mit einem Namen) zuweisen. Wir wählen den namen `demo`:
+
+```{r}
+haven::read_xpt( "DEMO_I.XPT" ) -> demo
+```
+
+Wir lesen die andere Tabelle ebenso ein:
+
+```{r}
+haven::read_xpt( "BMX_I.XPT" ) -> bmx
+```
+
+Die Variablen enthalten nun die Tabellen. Wenn man ihren Namen eingibt, zeigt R den Inhalt an:
+
+```{r}
+bmx
+```
+
+## Vorbereiten der Daten
+
+Wir müssen beide Tabellen zusammen fassen ("table join"). Zusammengehörende Zeilen erkennt man daran, dass sie dieselbe Personen-Nummer ("SEQN") enthalten. Wir fügen die beiden Tabellen mit der `inner_join`-Funktion so zusammen, dass jeweils eine Zeile aus der ersten tabelle und eine Zeile aus der zweiten zusammengefügt werden, wobei zusammengehörige Zeilen daran erkannt werden sollen, dass sie dieselbe Personen-ID (Spalte "SEQN") enthalten:
+
+```{r}
+inner_join( demo, bmx, by="SEQN")
+```
+
+Wir wählen aus diesen 72 Spalten diejenigen aus, die wir brauchen. Dies geschieht mit `select`. Bei der Gelegenheit ersetzen wir die kryptischen Abkürzungen durch verständlicherer Spalten-Überschriften:
+
+```{r}
+inner_join( demo, bmx, by="SEQN" ) %>%
+select( 
+   subjectId = SEQN,
+   age = RIDAGEYR,
+   sex = RIAGENDR,
+   height = BMXHT,
+   weight = BMXWT ) 
+```
+
+Die Bedeutung der kryptischen Abkürzungen habe ich auf den beiden oben erwähnten Webseiten mit der Tabellen-Dokumentation gefunden. 
+
+Das "Pipe-Symbol" "`%>%`" leitet die Daten, die aus der `inner_join`-Funktion "heraus kommen", an die `select`-Funtion weiter. Wir leiten dies nun gleich weiter an die folgende Funktion, die die ebenso kryptischen numerischen Codes (z.B., 1 für männlich, 2 für weiblich inder Spalte "sex") durch Wörter ersetzt. Die Zuordnung von Codes zu Wörtern findet sich ebenso in der Dokumntation auf der NHANES-Website.
+
+```{r}
+inner_join( demo, bmx, by="SEQN" ) %>%
+select( 
+   subjectId = SEQN,
+   age = RIDAGEYR,
+   sex = RIAGENDR,
+   height = BMXHT,
+   weight = BMXWT,
+   ethnicity = RIDRETH3,
+   education = DMDEDUC2,
+   bornInUS = DMDBORN4 ) %>%
+mutate(
+  sex = fct_recode( factor(sex), "male"="1", "female"="2" ),
+  ethnicity = fct_recode( factor(ethnicity), 
+    "mexican"="1", "hispanic"="2", "white"="3", "black"="4", "asian"="6", "other"="7" ),
+  education = fct_recode( factor(education),
+    "below9"="1", "9to11"="2", "high_school"="3", "some_college"="4",
+       "college"="5", "dontknow"="9" ),
+  bornInUS = fct_recode( factor(bornInUS),
+    "yes"="1", "no"="2", "dontknow"="99" )
+) ->  nhanes
+```
+
+Den komplizierten `mutate`-Befehl besprechen wir nicht weiter; das kommt später. 
+
+Hier haben wir nun eine Analyse-Pipeline mit zwei "%>%"-Pipes. Die erste Pipe schiebt die Tabelle von `inner_join` (was die beiden ursprünglichen Tabellen zusammen gefügt hat) zu `select` (was die benötigten Spalten ausgewählt und umbenannt hat) und die zweite `%>%`-Pipe schiebt es zu `mutate`, was die numerischen Codes durch beschreibende Wörter ersetzt. Zuletzt schieben wir das Ergebnis mit `->` in eine Variable namens `nhanes`. Diese enthält nun:
+
+```{r}
+nhanes
+```
+
+## Plotten
+
+Wir laden ein Paket an Zusatz-Funktionen namesn "ggplot2", das zur Datenvisualisierung dient
+
+```{r}
+library( ggplot2 )
+```
+
+Damit können wir nun Daten aus der `nhanes`-Tabelle plotten.
+
+Zum Beispiel können wir die Körpergröße gegen das Alter auftragen:
+
+```{r}
+nhanes %>%
+ggplot +
+  geom_point( aes( x = age, y = height ) )
+```
+
+Etwas verfeinert:
+
+```{r}
+nhanes %>%
+ggplot +
+  geom_point( aes( x = age, y = height, col=sex ), size=.3 )
+```
+
+Hier haben wir unsere Daten-Tabelle (`nhanes`) in die `ggplot`-Funktion geschoben (mit `%>%`) und dann der Plot-Funktion mitgeteilt, was wir plotten möchten: Jede Zeile soll durch einen Punkt (`geom_point`) dargestellt werden, mit `x`- und `y`-Koordinaten, sowie Farbe bestimmt durch die angegebenen Spalten der Tabelle.
+
+Wir können in unsere Analyse-Pipeline auch weitere Schritte einfügen, zum Beispiel einen Filter, damit wir nur die Zeilen behalten, die zu Erwachsenen (Alter mindestens 18) gehören:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+ggplot +
+  geom_point( aes( x = age, y = height, col=sex ), size=.3 )
+```
+Wir können auch andere Fragen stellen, z.B. den Zusammenhang aus Körpergröße und Gewicht, hier wieder nur für die Erwachsenen:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+ggplot +
+  geom_point( aes( x=height, y=weight, col=sex), size=.3, alpha=.5 )
+```
+
+Wir könenn auch Rechnung anstellen, zB, den Body Mass Index (BMI) berechnen. Dazu müssen wir das Gewicht in kg durch das Quadrat der  Körpergröße in Meter teilen. Um die Körpergröße von cm in m umzurechnen, teilen wir einfach durch 100:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+ggplot +
+  geom_point( aes( x = height, y = weight / (height/100)^2, col = sex), size=.3, alpha=.5 )
+```
+
+Als Density-Plot ist das vielleicht aussagekräftiger:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+ggplot +
+  geom_density( aes( x = weight / (height/100)^2, col = sex), size=.3, alpha=.5 )
+```
+
+Es gibt noch viele weitere `geom_`-Funktionen. Hier zumbeispiel vertikale Linien (`geom_vline`), um die Grenzen zu Untergewicht (BMI < 18), Übergewicht (BMI > 25) und Adipositas (BMI > 30) zu markieren:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+ggplot +
+  geom_density( aes( x = weight / (height/100)^2, col = sex), size=.3, alpha=.5 ) +
+  geom_vline( xintercept = c( 18, 25, 30 ), col="gray" )
+```
