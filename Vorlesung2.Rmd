@@ -1,0 +1,383 @@
+---
+title: "Data Science Lecture"
+author: "Simon Anders"
+date: "14 October 2019"
+output: html_document
+---
+
+## 2. Vorlesung (21.10.)
+
+Letztes Mal haben wir einen Teil der NHANES-Daten untersucht. 
+
+Hier der Code, mit dem wir letztes Mal die Daten geladen und vorbereitet haben
+
+```{r}
+library( tidyverse )
+
+haven::read_xpt( "DEMO_I.XPT" ) -> demo
+haven::read_xpt( "BMX_I.XPT" ) -> bmx
+
+inner_join( demo, bmx, by="SEQN" ) %>%
+select( 
+   subjectId = SEQN,
+   age = RIDAGEYR,
+   sex = RIAGENDR,
+   height = BMXHT,
+   weight = BMXWT,
+   ethnicity = RIDRETH3,
+   education = DMDEDUC2,
+   bornInUS = DMDBORN4 ) %>%
+mutate(
+  sex = fct_recode( factor(sex), "male"="1", "female"="2" ),
+  ethnicity = fct_recode( factor(ethnicity), 
+    "mexican"="1", "hispanic"="2", "white"="3", "black"="4", "asian"="6", "other"="7" ),
+  education = fct_recode( factor(education),
+    "below9"="1", "9to11"="2", "high_school"="3", "some_college"="4",
+       "college"="5", "dontknow"="9" ),
+  bornInUS = fct_recode( factor(bornInUS),
+    "yes"="1", "no"="2", "dontknow"="99" )
+) ->  nhanes
+
+nhanes
+```
+
+Der lange Teil in der Mitte ist recht kompliziert. Wir können ihn austesten, indem wir einzelne Teile mit der Maus markieren und ausführen lassen. (In der Vorlesung führe ich das hier vor.)
+
+Letztes Mal haben wir auch Plots gemacht.
+
+Zum Beispiel diesen hier:
+
+```{r}
+nhanes %>% 
+ggplot +
+  geom_point( aes( x = age, y = height, col = sex ), size = .2 )
+```
+
+Details:
+- Die Tabelle mit den Daten wird mit `%>%` in die `ggplot`-Funktion geschoben. 
+- Der Plot-Stil wird durch die `geom_`-Elemente ausgewählt. Es gibt eine breite Auswahl, siehe [hier](https://ggplot2.tidyverse.org/reference/index.html).
+- Hier verwenden wir `geom_point`, um einen *Scatter-Plot* zu erhalten.
+- Das erste Argument in einem `geom` ist immer die Aestethics-Spezifikation (`aes`), die den
+  verschiedenen aesthetics (hier `x`, `y`, `col`) Spalten-Namen aus der Daten-Tabelle zuweist.
+- Die Aesthetic `size` ist ausserhalb von `aes`, weil wir keine Daten aus der Tabelle verwenden.
+- Unter `?geom_point` findet man weiter aesthetics
+
+Wir haben auch den BMI geplottet, aber nur der erwachsenen Probanden:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+mutate( bmi = weight / (height/100)^2 ) %>%
+ggplot +
+  geom_point( aes( x = age, y = bmi, col = sex ), size=.2 ) +
+  geom_hline( yintercept = c( 18, 25, 30 ) )
+```
+  
+Hier haben wir zwei Tidyverse-Verben verwendet:
+- `filter`, um nur die Zeilen mit `age >= 18` zu behalten
+- `mutate`, um die neue Spalte `bmi` einzuführen
+
+Wir können auch ein Histogramm plotten:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+mutate( bmi = weight / (height/100)^2 ) %>%
+ggplot +
+  geom_freqpoly( aes( bmi, col=sex ), size=.2 ) +
+  geom_vline( xintercept = c( 18, 25, 30 ), col="gray" )
+```
+
+Oder besser eine Dichteschätzung, d.h. eine geglättete Version des Histogramms:
+
+```{r}
+nhanes %>%
+filter( age >= 18 ) %>%
+mutate( bmi = weight / (height/100)^2 ) %>%
+ggplot +
+  geom_density( aes( bmi, col=sex ), size=.2 ) +
+  geom_vline( xintercept = c( 18, 25, 30 ), col="gray" )
+```
+
+Eine neue Funktion: Facetting
+
+```{r fig.width=10}
+nhanes %>%
+filter( age >= 18 ) %>%
+mutate( bmi = weight / (height/100)^2 ) %>%
+ggplot +
+  geom_density( aes( bmi, col=sex ), size=.2 ) +
+  geom_vline( xintercept = c( 18, 25, 30 ), col="gray" ) +
+  facet_wrap( ~ ethnicity )
+```
+
+```{r fig.height=5}
+nhanes %>%
+filter( age >= 18 ) %>%
+mutate( bmi = weight / (height/100)^2 ) %>%
+ggplot +
+  geom_density( aes( bmi, col=ethnicity, stat(density) ), size=.2, binwidth=3 ) +
+  geom_vline( xintercept = c( 18, 25, 30 ), col="gray" ) +
+  facet_wrap( ~ sex )
+```
+
+### Summerize
+
+Was ist die durchschnittliche Körpergröße eines 14-jährigen Jungen?
+
+```{r}
+nhanes %>%
+filter( sex == "male", age == 14 ) %>%
+summarise( mean(height) )
+```
+
+Mit `summerize` fassen wir die Tabelle zu einer einzelnen Zeile zusammen.
+
+Nebenbei: Für Vergleiche muss mann `==` verwenden, nicht `=`.
+
+Und 11-jährige Jungen?
+
+```{r}
+nhanes %>%
+filter( sex == "male", age == 11 ) %>%
+summarise( mean(height) )
+```
+
+Warum geht das jetzt nicht? Indem wir nur die ersten zwei Zeilen ausprobieren, finden wir das Problem: Fehlende Daten, markiert mit `NA` (für "not available"). Wir müssen diese entfernen:
+
+```{r}
+nhanes %>%
+filter( sex == "male", age == 11, !is.na(height) ) %>%
+summarise( mean(height) )
+```
+
+Die Funktion `is.na` fragt: Ist der Wert "not available"? Das Rufzeichen (`!`) ist der "not operator"; er verkehrt die Antwort auf eine Frage ins Gegenteil.
+
+Wie sieht es mit 7-jährigen Mädchen aus? Und 12-jährigen Jungen? usw.? Wir verwenden `group_by` statt `filter`:
+
+```{r}
+nhanes %>%
+filter( !is.na(height) ) %>%
+group_by( sex, age ) %>%
+summarise( mean(height) )
+```
+
+Wir können das plotten:
+
+```{r}
+nhanes %>%
+filter( !is.na( height ) ) %>%
+group_by( sex, age ) %>%
+summarise( mean(height) ) %>%
+ggplot +
+   geom_line( aes( x = age, y = `mean(height)`, col = sex ) )
+```
+
+### Unsicherheit eines Schätzers
+
+Hier sind die Größen aller Männer zwischen 20 und 40:
+
+```{r}
+nhanes %>% 
+filter( sex=="male", age>=20, age<=40, !is.na(height) ) %>% 
+pull(height) -> h24
+
+h24
+```
+
+Das sind 918 Probanden. Der Durchschnitt ist
+
+```{r}
+mean( h24 )
+```
+
+Wenn wir 918 andere Männer im Alter 20-40 vermessen würden, wäre der Durchschnittswert sicher leicht anders. Aber um wie viel? Wie genau ist under Durchschnitt? 
+
+Wir können leider nicht 918 neue Männer vermessen (zu viel Mühe), also fragen wir etwas einfacheres: Wenn wir 30 Männer vermessen, wie stark schwankt der Durchschnitt?
+
+Wir wählen aus den 918 Werten zufällig 30 Werte aus:
+
+```{r}
+h24 %>% sample( 30 )
+```
+
+Die Funktion `sample` gibt uns jedesmal eine andere Stichprobe von 30 Werten:
+
+```{r}
+h24 %>% sample( 30 )
+```
+
+Wir bilden den Mittelwert:
+
+```{r}
+h24 %>% sample( 30 ) %>% mean
+```
+
+Wenn wir das mehrmals machen, bekommen wir jedes Mal einen anderen Wert:
+
+```{r}
+h24 %>% sample( 30 ) %>% mean
+
+h24 %>% sample( 30 ) %>% mean
+```
+
+Wir versuchen das 1000 Mal
+
+```{r}
+replicate( 1000, 
+  { h24 %>% sample( 30 ) %>% mean }
+) -> h24means
+```
+
+
+Hier ist ein Histogram dieser Werte
+
+```{r}
+hist( h24means, xlim=c(168, 182) )
+```
+
+Ein solcher Durchschnittswert, gebildet aus 30 Probanden, kann also leicht um 3 cm oder sogar mehr vom wahren Durchschnittswert abweichen.
+
+Wie, wenn wir viermal so viele Probanden (120 statt 30) nehmen?
+
+```{r}
+replicate( 1000, 
+  { h24 %>% sample( 120 ) %>% mean }
+) %>% hist( xlim=c(168, 182) )
+```
+
+Die Stichproben-Größe zu vervierfachen scheint die Genauigkeit zu verdoppeln. 
+
+### Standardfehler eines Mittelwerts (Standard error of the mean)
+
+Für einen Mittelwert gilt bekanntlich:
+
+Der Standardfehler eines Mittelwerts (S.E.M. für standard error of the mean) ist bekanntlich gleich der Standardabweichung $\sigma$ der Daten, über die gemittelt wurde, geteilt durch die Wurzel der Stichprobengröße (also der Anzahl an Werten) $N$:
+
+$$ \text{SEM} = \frac{\sigma}{\sqrt{N}}$$
+
+Wir können das kurz überprüfen:
+
+Mittelwert und Standardabweichung (engl. "standard deviation", abgekürzt SD) unserer Werte sind:
+```{r}
+mean( h24 )
+sd( h24 )
+```
+
+Die Standardabweichung unserer Mittelwerte is 
+```{r}
+sd( h24means)
+```
+
+Die sollte gleich dem SEM sein, wenn wir $N=30$ setzen:
+
+```{r}
+7.74 / sqrt(30)
+```
+
+### Ribbons
+
+Zurück zu der Kurve der Körpergröße nach Alter. Für jedes Alter haben wir eine bestimmt Anzahl an Probanden, und erhalten so einen SEM für den Mittelwert für dieses Alter. Statt einer Kurve der Mittelwerte können wir auch Konfidenzintervalle plotten. Hier zählen wir zum Mittelwert zweimal den SEM hinzu, oder ziehen dies ab, um den Bereich zu finden, in dem der SEM mit 95% ($\hat= 2\sigma$) Konfidenz liegt.
+
+```{r}
+nhanes %>%
+filter( !is.na( height ) ) %>%
+group_by( sex, age ) %>%
+summarise( 
+  mean_height = mean(height),
+  sd_height = sd(height),
+  n = n()
+) %>%
+mutate(
+  sem = sd_height / sqrt( n ) 
+) %>%
+mutate(
+  lo = mean_height - 2 * sem,
+  hi = mean_height + 2 * sem
+) %>%
+ggplot  +
+  geom_ribbon( aes( x = age, ymin = lo, ymax = hi, fill = sex ) )
+
+```
+
+
+### Inferenz
+
+Sind Männer über 60 wirklich kleiner als Männer im Alter 20-59?
+
+Dazu sortieren wir die Männer zunächst in zwei Gruppen. 
+```{r}
+nhanes %>%
+filter( sex == "male", age >= 20, !is.na(height) ) %>%
+mutate( group = ifelse( age >= 60, "old", "young" ) ) -> men
+```
+
+Dann summarisieren wir
+```{r}
+men %>%
+group_by( group ) %>%
+summarise( mean(height) )
+```
+
+Wie bekommen wir die Differenz? Hier ist eine von vielen Möglichkeiten, die nicht allzu viel neues R verwendet:
+
+```{r}
+men %>%
+group_by( group ) %>%
+summarise( mean(height) ) %>%
+deframe -> a
+
+a["old"] - a["young"]
+```
+
+Ist das statistisch signifikant?
+
+Könnte dieser Unterschied Zufall sein? Das heisst, wenn wir andere Probanden hätten, könnte es sein, dass etwas ganz anderes heraus bekommt?
+
+Dazu stellen wir eine *Null-Hypothese* auf: "Es gibt keinen Unterschied in der durchschnittlichen Körpergröße in den Gruppen *young* (20 <= age < 60) und *old* (age > 60)."
+
+Wenn es keinen Unterschied gäbe, dann würde sich nichts ändern, wenn wir die Zuordnung der Probanden zu den Gruppen durcheinander brächten.
+
+Die FUnktion `sample` *permutiert* Daten:
+
+```{r}
+sample( c( "A", "B", "C", "D", "E" ) )
+sample( c( "A", "B", "C", "D", "E" ) )
+```
+
+Wir permutieren die Gruppen-Zuordnung:
+
+```{r}
+men %>%
+mutate( group = sample( group ) ) %>%
+group_by( group ) %>%
+summarise( mean(height) ) %>%
+deframe -> a
+
+a["old"] - a["young"]
+```
+
+Jetzt bekommen wir jedes Mal ein anderes Ergebnis, weil `sample` eine Zufalls-Funktion ist.
+
+Wir tun dies nun 10000 mal
+
+```{r}
+replicate( 10000, 
+  {
+    men %>%
+    mutate( group = sample( group ) ) %>%
+    group_by( group ) %>%
+    summarise( mean(height) ) %>%
+    deframe -> a
+    
+    a["old"] - a["young"]
+  }
+) -> nulldiffs
+```
+
+```{r}
+hist( nulldiffs, breaks=30 )
+```
+
+Wenn die Differenz weniger als 1 cm gewesen wäre, hätte es auch Zufall sein können. Eine Differenz von 2.8 cm ist aber ganz klar statistisch signifikant: Wenn wir die Untersuchung mit anderen Probanden wiederholten, könnten wir sehr sicher sein, dass wir wieder fänden, dass Männer ab 60 Jahre im Durchschnitt kleiner sind als Männer unter 60.
+
