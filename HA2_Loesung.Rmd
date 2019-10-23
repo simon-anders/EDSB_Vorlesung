@@ -1,0 +1,148 @@
+---
+title: "Data Science Lecture HA2 - Lösung"
+author: "Konrad Herbst"
+date: "23 October 2019"
+output: html_document
+---
+
+## Hausaufgabe, 2. Woche
+
+### Datenvorbereitung
+```{r}
+library( tidyverse )
+
+haven::read_xpt( "DEMO_I.XPT" ) -> demo
+haven::read_xpt( "BMX_I.XPT" ) -> bmx
+
+inner_join( demo, bmx, by="SEQN" ) %>%
+select( 
+   subjectId = SEQN,
+   age = RIDAGEYR,
+   sex = RIAGENDR,
+   height = BMXHT,
+   weight = BMXWT,
+   ethnicity = RIDRETH3,
+   education = DMDEDUC2,
+   bornInUS = DMDBORN4 ) %>%
+mutate(
+  sex = fct_recode( factor(sex), "male"="1", "female"="2" ),
+  ethnicity = fct_recode( factor(ethnicity), 
+    "mexican"="1", "hispanic"="2", "white"="3", "black"="4", "asian"="6", "other"="7" ),
+  education = fct_recode( factor(education),
+    "below9"="1", "9to11"="2", "high_school"="3", "some_college"="4",
+       "college"="5", "dontknow"="9" ),
+  bornInUS = fct_recode( factor(bornInUS),
+    "yes"="1", "no"="2", "dontknow"="99" )
+) ->  nhanes
+
+```
+
+### Q1
+> 1. In der Vorlesung haben wir die durchschnittliche Körpergröße von Männern im Alter 20-60 Jahre mit Männern über 60 verglichen. Vollziehen Sie die Rechnung nochmals nach, aber diesmal für die Frauen.
+
+> a) Gehen Sie zunächst genauso vor wie in der Vorlesung.
+
+Aus Abschnitt *Inferenz*.
+Sind Frauen über 60 wirklich kleiner als Frauen im Alter 20-59?
+
+Dazu sortieren wir die Frauen zunächst in zwei Gruppen. 
+```{r}
+nhanes %>%
+filter( sex == "female", age >= 20, !is.na(height) ) %>%
+mutate( group = ifelse( age >= 60, "old", "young" ) ) -> women
+```
+
+Dann summarisieren wir
+```{r}
+women %>%
+group_by( group ) %>%
+summarise( mean(height) )
+```
+
+> b) Alternative können wir auch mit dem Standardfehler des Mittelwerts arbeiten: Rechnen Sie zunächst die Durchschnittsgröße für die Frauen im Alter 20-60 und auch für die Frauen im Alter über 60 aus.
+
+> Was sind die Standardfehler dieser beiden Mittelwerte?
+
+```{r}
+women %>%
+  group_by( group ) %>%
+  summarise( sd(height) / sqrt(n()) ) %>%
+  deframe -> sem
+sem
+```
+
+> Ziehen Sie nun die beiden Werte von einander ab.
+
+```{r}
+women %>%
+  group_by( group ) %>%
+  summarise( mean(height) ) %>%
+  deframe -> a
+a["old"] - a["young"]
+```
+
+> Was ist der Standardfehler der Differenz?
+
+> [Hinweis: Wenn zwei Statistiken x und y die Standard-Fehler (auch "Unsicherheiten" genannt) $u_x$ und $u_y$ haben, dann gilt für den Standardfehler $u_S$ ihrer Summe oder ihrer Differenz: $u_x2 + u_y2 = u_S2$. ]
+
+Wir ziehen die Wurzel $$ u_S = \sqrt{u_x^2 + u_y^2} $$.
+
+```{r}
+sqrt( sem["old"]^2 - sem["young"]^2 )
+```
+
+> c) Wenn Sie nun den Standardfehler der Differenz betrachten, können Sie einen Bereich von plausiblen Werten für die Differenz (ein "Konfidenzintervall") angeben. Schließt dieses die Null mit ein?
+
+```{r}
+sqrt( sem["old"]^2 - sem["young"]^2 ) -> uS
+a["old"] - a["young"] + 2*uS
+```
+```{r}
+a["old"] - a["young"] - 2*uS
+```
+
+Nein, die Null ist nicht mit eingeschlossen.
+
+> Was folgern Sie daraus?
+
+Die wahre Differenz zwischen den Mittelwerten ist mit 95 % Wahrscheinleichkeit wirklich ungleich Null. Die beiden Altersklassen der Frauen sind also mit ziemlicher Sicherheit unterschiedlich groß. 
+
+> Um ein wieviel-faches ihres Standardfehlers liegt die Differenz von Null entfernt? (Dieser letzte Quotient ist der sogenannte z-Wert. Wir werden darauf zurück kommen.)
+
+```{r}
+(0 - ( a["old"] - a["young"] )) / uS
+```
+
+### Q2
+> 2. Unterscheidet sich die Verteilung der Körpergrößen von Erwachsenen zwischen den Ethnien in der NHANES-Studie? Erzeugen Sie Histogramme (geom_histogram) oder Verteilungskurven (geom_density), um dieser Frage nachzugehen, und bilden Sie sich eine erste Meinung.
+
+Histograme
+```{r}
+nhanes %>%
+  filter( age >= 18 ) %>%
+  ggplot +
+    geom_freqpoly( aes( height, col = ethnicity ), size = .2 ) 
+```
+
+Verteilungskurven
+```{r}
+nhanes %>%
+  filter( age >= 18 ) %>%
+  ggplot +
+    geom_density( aes( height, col = ethnicity ), size = .2 ) 
+```
+*mexican*, *hispanic* und *asian* scheinen kleiner zu sein als *white*, *black* und *other*.
+
+> 3. Die von Erwachsenen erreichte Körpergröße hängt, neben der Genetik, auch stark von der Ernährung in den ersten drei Lebensjahren ab. Studienteilnehmer, die nicht in den USA geboren wurden (siehe Tabellen-Spalte "bornInUS"), sind vielleicht als Kind in die USA immigriert, weil ihre Eltern wirtschaftlich schwierigen Verhältnissen entflohen. Ist daher eine Abhängigkeit der Körpergröße  vom "BornInUS"-Status erkennbar? Überprüfen Sie dies für jede Ethnie separat.
+
+```{r}
+nhanes %>%
+  filter( age >= 18 ) %>%
+  ggplot +
+    geom_density( aes( height, col = bornInUS ), size = .2 ) +
+    facet_grid( ~ ethnicity )
+```
+
+
+
+> 4. Ein Ergebnis einfach anzugeben, ist eine Sache, es auch gut zu begründen, eine andere. Verfassen Sie für eines der Ergebnisse der vorstehenden Fragen einen kurzen "Bericht" (vielleicht eine gute halbe Seite), der die Fragestellung darstellt, die Daten erläutert, die zur Beantwortung verwendeten Daten genau angibt, die Rechnung erläutert, und das Ergebnis nicht nur als Zahl wiedergibt, sondern auch durch einen geeigneten Plot veranschaulicht.
