@@ -1,0 +1,364 @@
+---
+title: "Data Science Lecture"
+author: "Simon Anders"
+date: "28 October 2019"
+output: html_document
+---
+
+## 3. Vorlesung (28.10.)
+
+### Zunáchst ein Ratschlag
+
+Der viele R-Code in diesem Dokument kann einschüchternd wirken. Ignorieren Sie allen Code also zunächst einfach. Sehen Sie sich nur den Text an und die Ergebnisse und Plots. Sie werden sehen, dass sich bereits so die Konzepte erschließen, und das ist das Wichtige. Zu lernen, die Details des R-Codes zu verstehen, und gar selbst in der Lage zu sein, solchen Code zu schreiben, ist zweitrangig. 
+
+Und keine Sorge: Ich werde von niemandem erwarten, derart komplexen Code selbständig in einer Klausur zu schreiben. Da wird es dann mehr um Verständnis eben dieser Konzepte gehen. 
+
+Und natürlich werden wir, wie versprochen, eben diese Konzepte in der nächsten Vorlesung nochmals durchsprechen, und ich werde auch einige Slides dazu vorbereiten. 
+
+### Null-Verteilung
+
+In der zweiten Vorlesung hatten wir ein Beispiel für einen statisch stark signifikanten Unterschied zwiuschen zwei Gruppen: wir haben gefunden, dass im NAHNES-Datensatz Männer im Alter 60-80 Jahre im Mittel fast 3 cm kleiner sind als Männer im Alter 20-60 Jahre. Zum Vergleich schauen wir uns noch an, wie das aussieht, wenn wir eine Hypothese testen, die keinen Sinn macht, nämlich, dass Probanden, denen in der Umfrage eine geradzahlige Probanden-Nummer ("even") zugewiesen wurde, einen andere Durchschnittsgröße haben als Probanden mit ungeradzahliger Nummer ("odd").
+
+Wir laden zunächste die Daten, wie zuvor
+
+```{r}
+suppressPackageStartupMessages( library( tidyverse ) )
+
+haven::read_xpt( "~/w/Lecture/L1/DEMO_I.XPT" ) -> demo
+haven::read_xpt( "~/w/Lecture/L1/BMX_I.XPT" ) -> bmx
+
+inner_join( demo, bmx, by="SEQN" ) %>%
+select( 
+  subjectId = SEQN,
+  age = RIDAGEYR,
+  sex = RIAGENDR,
+  height = BMXHT,
+  weight = BMXWT,
+  ethnicity = RIDRETH3,
+  education = DMDEDUC2,
+  bornInUS = DMDBORN4,
+  maritalStatus = DMDMARTL ) %>%
+mutate(
+  sex = fct_recode( factor(sex), "male"="1", "female"="2" ),
+  ethnicity = fct_recode( factor(ethnicity), 
+       "mexican"="1", "hispanic"="2", "white"="3", "black"="4", "asian"="6", "other"="7" ),
+  education = fct_recode( factor(education),
+       "below9"="1", "9to11"="2", "high_school"="3", "some_college"="4",
+       "college"="5", "dontknow"="9" ),
+  bornInUS = fct_recode( factor(bornInUS),
+       "yes"="1", "no"="2", "dontknow"="99" )                               
+) ->  nhanes
+```
+
+Das folgende Dokument enthält einige Stellen, wo zufällige Daten ausgewürfelt werden. Der folgende Trick bewirkt, dass jedes Mal, wenn man es ausführt, dasselbe herauskommen wird:
+
+```{r}
+set.seed( 12345678 )
+```
+
+Wir filtern die Kinder aus und führen die neue Spalte mit der gerade/ungerade-Unterscheidung ein. Ausserdem, simulieren wir die Situation, dass wir nur sehr wenige Probanden haben, indem wir 20 zufällige Zeilen herausziehen und den Rest verwerfen.
+
+```{r}
+nhanes %>%
+  filter( age > 20, !is.na(height) ) %>%
+  sample_n( 20 ) %>%
+  mutate( parity = ifelse( subjectId %% 2, "even", "odd" ) ) %>%
+  select( subjectId, height, parity ) -> a
+```
+
+Unser Datentabelle sieht nun so aus
+```{r}
+a
+```
+
+Wie beim letzten mal berechnen wir den Mittelwert der Körpergröße der geraden und der ungeraden Personen:
+
+```{r}
+a %>%
+  group_by( parity ) %>%
+  summarise( mean_height = mean( height ) ) 
+```
+
+Wir berechnen die Differenz:
+
+```{r}
+a %>%
+  group_by( parity ) %>%
+  summarise( mean_height = mean( height ) ) %>%
+  spread( parity, mean_height ) %>%
+  mutate( diff = even - odd ) %>%
+  pull( diff ) -> parityDiff
+
+parityDiff
+```
+
+Wie beim letzten Mal wiederholen wir dies nun wieder 1000 mal, verwürfeln dabei aber jedes mal die Zuordnung von Probanden zu "odd" oder "even":
+
+```{r}
+replicate( 1000, {
+  a %>%
+  mutate( parity = sample(parity) ) %>%
+  group_by( parity ) %>%
+  summarise( mean_height = mean( height ) ) %>%
+  spread( parity, mean_height ) %>%
+  mutate( diff = even - odd ) %>%
+  pull( diff ) } ) -> nullDiffs
+```
+
+Hier ist ein Histogram der Nullverteilung, und mit einer grünen Linie, die "wahre" Differenz:
+
+```{r}
+hist(nullDiffs)
+abline( v=parityDiff, col="darkgreen" )
+```
+
+Wir wir sehen gibt es sehr viele nullDiff-Werte, die weiter von der Mitte entfernt sind als der beobachtete Wert:
+
+```{r}
+table( nullDiffs < parityDiff )
+table( nullDiffs > -parityDiff )
+```
+
+```{r}
+table( abs(nullDiffs) > abs(parityDiff) )
+```
+
+Insgesamt sind `r sum( abs(nullDiffs) > abs(parityDiff) )` von 1000 Null-Werten extremer als der ohnen Permutation beobachtete Wert. Dieses Verhältnis, also `mean( abs(nullDiffs) > abs(parityDiff) )`, bezeichnet man als p-Wert.
+
+Der p-Wert ist ein Maß für die statistche Signifikanz des Ergebnisses eines Hypothesentests. **Der p-Wert gibt an, wie wahrscheinlich es wäre, das beobachtete Ergebnis, oder ein noch stärkeres Ergebnis zu erhalten, wenn es den vermuteten Effekt nicht gäbe (wenn also die Null-Hypthese zuträfe).**
+
+Bei unserem Test in der vorigen Vorlesung war keiner der 1000 Permutations-Werte extremer als die beobachteten 2.8 cm Unterschied zwischen alten und nicht-alten Männern. Der p-Wert für die Behauptung, dass die alten Männer kleiner sind, ist als kleiner als 1/1000 = 0.001. Das ist statistisch recht signifikant. Diesmal ist der p-Wert recht hoch, nämlich `mean( abs(nullDiffs) > abs(parityDiff) )`. Das ist nicht signifikant.
+
+
+### RNA-Seq
+
+Als ein erstes biologische Beispiel betrachten wir nun RNA-Seq-Daten von einer Studie zu Psoriasis (Schuppenflechte). Die Daten stammen von diesem Paper:
+
+Li et al.: *Transcriptome Analysis of Psoriasis in a Large Case–Control Sample: RNA-Seq Provides Insights into Disease Mechanisms.* Journal of Investigative Dermatology, Volume 134, Pages 1828–1838 (July 2014). DOI: https://doi.org/10.1038/jid.2014.28
+
+Die Autoren haben Hautproben von erkrankten Hautstellen von 92 Patienten mit Psoriasis genommen und von 82 Kontroll-Personen ohne Hautkrankheit, und für jede dieser Proben die Genexpression der Hautzellen mittels RNA-Seq gemessen.
+
+Die präprozessierten Daten finden wir über das [ReCount2-Projekt](https://jhubiostatistics.shinyapps.io/recount/), dass aufbereitete Daten für viele RNA-Seq-Studien bereitstellt. Die Psoriasis-Studie findet sich hier unter Zugriffsnummer SRP035988; eine Daten-Matrix finden wir unter dieser URL: http://duffel.rail.bio/recount/v2/SRP035988/counts_gene.tsv.gz
+
+```{r}
+read_tsv( "counts_gene.tsv.gz" ) ->  countsWide
+```
+
+Die Matrix enthält eine Spalte für jeden Probanden, und eine Zeile für jedes Gen. hier, z.B. die ersten 5 Zeilen und letzten 5 Spalten
+
+```{r}
+countsWide[ 1:5, 175:179 ]
+```
+Die Spaltenüberschiften bezeichnen die Patienten. Die letzte Spalte enthält sog. Ensembl-Gene-IDs, die die verschiedenen Gene des menschlichen Genoms beschreiben.
+
+Wir benötigen zunächst eine Tabelle, die diese IDs in verständliche Namen umsetzt. Diese Tabelle habe ich von Ensembl herunter geladen. (Wo man sie findet, zeige ich ein anderes Mal. Für jetzt finden Sie sie hier: [gene_ids.tsv](gene_ids.tsv) )
+
+```{r}
+read_tsv( "gene_ids.tsv" ) -> genes
+
+head( genes )
+```
+
+(Klicken Sie auf die Pfeile, um alle drei Spalten zu sehen.)
+
+Die Spaltenüberschiften in der großen Daten-Tabelle stehen für die Probanden. Auf ReCount2 finden wir auch eine Tabelle, die uns sagt, welche dieser Probanden gesund waren und welche krank: http://duffel.rail.bio/recount/SRP035988/SRP035988.tsv
+
+```{r}
+read_tsv( "SRP035988.tsv" ) -> head
+```
+
+Uns interessieren nur wenige dieser vielen Spalten:
+
+```{r}
+read_tsv( "SRP035988.tsv" ) %>%
+select( sample = run, subject = title, condition = characteristics ) %>%
+mutate( condition = fct_recode( condition,
+  "normal" = "tissue type: normal skin",
+  "psoriatic" = "tissue type: lesional psoriatic skin" ) ) -> sampleTable
+
+sampleTable
+```
+
+Um die große Datentabelle etwas handlicher zu machen, "pivotieren" wir sie, so dass jede Zeile nur noch eine Zahl enthält:
+
+```{r}
+countsWide %>%
+  gather( sample, count, -gene_id ) -> countsLong
+
+head(countsLong)
+```
+
+Die erste Zeile hier sagt uns nun z.B., dass in der Probe "SRR1146076" 26,160 RNA-Sequenzen gelesen wurden, die von Gen "ENSG00000000003.14" stammen.
+
+Wir können unsere beiden anderen Tabellen nun hier anhängen. (Wenn Sie genau hingehen haben, werdem Sie bemerkt haben, dass die Gene-IDs in der counts-Tabelle etwas länger sidn als in der genes-Tabelle. Der merkwürdige mutate-Befehl im folgenden Code-Block entfernt diese Anhängsel.)
+
+```{r}
+countsLong %>%
+mutate( gene_id = str_remove( gene_id, "\\.\\d+")) %>%
+left_join( sampleTable ) %>%
+left_join( genes ) %>%
+head
+```
+Nun sehen wir dass die erste Probe von einer gesunden Person kam, und das erste Gen das Symbol "TSPAN6" hat.
+
+Zunächst möchten wir sehen, wie viele Sequenzen insgesamt von jeder Probe gelesen wurden:
+
+```{r}
+countsLong %>%
+group_by( sample ) %>%
+summarize( total = sum( count ) ) -> totals
+
+head( totals )
+```
+
+Üblicherweise gibt man Genexpression in der Einheit "Trancripts per Million" (TPM) an, d.h., man gibt an, wieviele von jeweils einer Million Sequenzen von dem betreffenden Gen stammte. Daher müssen wir die Zähl-Werte durch die Gesamtzahl an Millionen Reads pro Probe teilen:
+
+```{r}
+countsLong %>%
+left_join( totals ) %>%
+mutate( tpm = count / ( total / 1000000 ) ) %>%
+head
+```
+
+Wir speichern dies als neue Tabelle
+
+```{r}
+countsLong %>%
+mutate( gene_id = str_remove( gene_id, "\\.\\d+")) %>%
+left_join( totals ) %>%
+mutate( tpm = count / ( total / 1000000 ) ) %>%
+select( gene_id, sample, tpm ) -> tpmTable
+
+head( tpmTable )
+```
+
+Nun können wir für jedes Gen berchen, wie stark es exprimiert ist im Mittelwert über alle gesunden Proben und über all Läsions-Proben:
+
+```{r}
+tpmTable %>%
+left_join( sampleTable ) %>%
+group_by( gene_id, condition ) %>%
+summarize( mean_tpm = mean( tpm ) ) -> a
+
+head(a)
+```
+
+Die "spread"-Funktion erlaubt uns, die Werte für krank und gesund nebeneinder statt untereinander zu sehen:
+
+```{r}
+a %>% spread( condition, mean_tpm )
+```
+
+Wenn wir nun noch die Gen-Namen anhängen, haben wir eine schöne Tabelle mit unserem Ergebnis
+
+```{r}
+a %>% 
+spread( condition, mean_tpm ) %>%
+left_join( genes ) -> resultTable
+
+head( resultTable )
+```
+
+Noch besser wird die Ergebnis-Tabelle, wenn wir auch noch die mittlere Expression jedes Gens, und des Verhältnis "krank geteilt durch gesund" einfügen:
+
+```{r}
+a %>% 
+spread( condition, mean_tpm ) %>%
+mutate( 
+  mean_expr = ( normal + psoriatic )/2,
+  ratio = psoriatic / normal ) %>%
+left_join( genes ) -> resultTable
+
+head( resultTable )
+```
+
+Nun können wir diese Tavbelle nach "ratio" sortieren und uns ein Gen aussuchen, das in den Läsions-Proben viel stärker exprimiert ist als in den Proben von gesunder Haut. Das Gen DYNAP ("dynactin associated protein"), mit ID "ENSG00000178690", ist z.B. 21.9-fach hochreguliert. Das sehen wir uns mal genauer an:
+
+```{r}
+tpmTable %>%
+filter( gene_id == "ENSG00000178690" ) %>%
+left_join( sampleTable ) %>%
+ggplot +
+   geom_point( aes( x=sample, y=tpm, col=condition) ) +
+   scale_y_log10() +
+   ggtitle( "DYNAP" )
+```
+
+Wir können uns auch einen Überblick verschaffen, indem wir jedes Gen in der "resultTable" durch einen Punkt darstellen:
+
+```{r}
+resultTable %>%
+ggplot +
+  geom_point( aes( x=mean_expr, y=ratio ), size=.2, alpha=.3 ) +
+  scale_x_log10() + scale_y_log10() +
+  xlab( "average expression of gene" ) +
+  ylab( "ratio of expression, psoriatic : normal" )
+```
+
+Jedes Gen ist hier ein Punkt; die Punkte weitb oben sind Gene, die in Psoriasis stark hochreguliert sind, die ganz unten stark "herunter-reguliert". Man nennt diese Darstellung einen MA-Plot.
+
+Als letztes wollen wir noch sehen, wie die Nullverteilung aussieht. Dazu wiederholen wir die Rechnung, die zur Results-Tabelle führte, permutieren aber vorher die Zuweisung von Proben zu "psoriatisch" oder "normal":
+
+```{r}
+# randomly shuffle the condition column
+sampleTable %>%
+mutate( condition = sample( condition ) ) -> sampleTableShuffled
+
+# Redo the calculation with the suffled table
+tpmTable %>%
+left_join( sampleTableShuffled ) %>%
+group_by( gene_id, condition ) %>%
+summarize( mean_tpm = mean( tpm ) ) %>%
+spread( condition, mean_tpm ) %>%
+mutate( 
+  mean_expr = ( normal + psoriatic )/2,
+  ratio = psoriatic / normal ) %>%
+left_join( genes ) -> resultTableShuffled
+```
+
+Ein neuer MA-Plot:
+
+```{r}
+resultTableShuffled %>%
+ggplot +
+  geom_point( aes( x=mean_expr, y=ratio ), size=.2, alpha=.3 ) +
+  scale_x_log10() + scale_y_log10() +
+  xlab( "average expression of gene" ) +
+  ylab( "ratio of expression, psoriatic : normal" )
+```
+
+Beide Plots übereinander:
+
+```{r}
+left_join( resultTable, resultTableShuffled, by="gene_id" ) %>%
+ggplot +
+  geom_point( aes( x=mean_expr.x, y=ratio.x ), size=.2, alpha=.3 ) +
+  geom_point( aes( x=mean_expr.y, y=ratio.y ), size=.2, col="purple" ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  geom_hline( yintercept = c( 2, 1/2 ), col="darkgreen" ) +
+  geom_vline( xintercept = 0.01, col="darkgreen" ) 
+
+```
+
+Die grünen Linien markieren die Gene mit mean expression über 0.01 TPM und einem mindestens 2-fachen Verhältnis zwischen krank und gesund. Diese Bereiche enthalten wenige violette Punkte; daher möchten wir diese nun zunächst als unsere "signifikant differentiell exprimierten Gene" betrachten.
+
+Wie viele sind das?
+
+```{r}
+resultTable %>%
+filter( mean_expr > 0.01 ) %>%
+filter( ratio > 2 | ratio < 1/2 ) %>%
+nrow()
+```
+
+Und wie viele Falsch-Positive sind da wohl dabei? Zu sehen, wie viele Gene trotz Permutation diese grenze überschreiten (wie viele violette Punkte also im "grünen Bereich" sind), gibt uns eine grobe Abschätzung:
+
+```{r}
+resultTableShuffled %>%
+filter( mean_expr > 0.01 ) %>%
+filter( ratio > 2 | ratio < 1/2 ) %>%
+nrow()
+```
+
+Dies sind weniger als 2%. Wir können also sagen, dass die sog. "false discovery rate" unserer Liste von gut 6754 differentiell exprimierten Gene unter 2% liegt.
