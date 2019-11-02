@@ -1,0 +1,263 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h1 id="vorlesung">4. Vorlesung</h1>
+<h4 id="blank-space">[blank space]</h4>
+<pre><code>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</code></pre>
+<h2 id="übungen">Übungen</h2>
+<p>Wie die Übungen laufen sollten:</p>
+<ul>
+<li>Sie versuchen die Hausaufgaben zuhause.</li>
+<li>Bei Problemen fragen Sie im Forum.</li>
+<li>Während der Übung führt der Tutor die Lösung Schritt für Schritt vor.</li>
+<li>Sie versuchen jeden Schritt auf Ihrem Laptop.</li>
+<li>Der Tutor wartet, bis allen der Schritt gelungen ist, und hilft, wenn es hakt.</li>
+<li>Dann wird diskutiert, was der Befehl genau macht.</li>
+<li>Jeder versucht, den Befehl abzuwandeln, um zu sehen, was geschieht.</li>
+<li>Erst wenn alle den Befehl verstanden haben, geht der Tutor zum nächsten Schritt.</li>
+</ul>
+<h2 id="rna-seq">RNA-Seq</h2>
+<p>Analyse von RNA-Seq-Daten ist eine Standard-Aufgabe in der Bioinformatik.</p>
+<p>Wir sehen uns das daher recht genau an.</p>
+<h2 id="rna-seq-übersicht">RNA-Seq: Übersicht</h2>
+<ul>
+<li>Extrahierere und amplifiziere alle mRNA in einer Probe</li>
+<li>Sequenziere die RNA</li>
+<li>Identifiziere die Gene, von der die Sequenzen kommen</li>
+<li>Zähle, wie viele Sequenzen (Reads) von jedem Gen kommen</li>
+<li>Find Gene, die in den Sample-Gruppen verschieden stark exprimiert sind</li>
+</ul>
+<h2 id="rna-seq-vorgehen-labor">RNA-Seq: Vorgehen / Labor</h2>
+<p>Illumina-Verfahren:</p>
+<ul>
+<li>Löse die Zellmembranen auf</li>
+<li>Ziehe die mRNA mittels magnetischer Beads mit polyT-Oligos heraus</li>
+<li>Fragmentiere die mRNA mit Ultraschall</li>
+<li>Wandle die mRNA mittels Reverser Transkriptase in cDNA um</li>
+<li>PCR-Amplifiziere die cDNA</li>
+<li>Lade die cDNA in die Flow-cell</li>
+<li>Führe Bridge-PCR in der Flow cell durch</li>
+<li>Sequenziere die DNA in der Flow cell mit Sequencing-by-Synthesis</li>
+</ul>
+<h2 id="bridge-pcr-und-sequencing-by-synthesis">Bridge PCR und Sequencing-by-Synthesis</h2>
+<p>https://en.wikipedia.org/wiki/Illumina_dye_sequencing</p>
+<p>Flow cell:</p>
+<div class="figure">
+<img src="patterned-flow-cell-video-web-graphic.jpg" />
+
+</div>
+<p>Bridge PCR:</p>
+<div class="figure">
+<img src="Cluster-generation-by-bridge-amplification-of-Illumina-a-Randomly-fragmented-genomic.png" />
+
+</div>
+<p>Sequencing by synthesis</p>
+<div class="figure">
+<img src="seqbysynth.jpg" />
+
+</div>
+<h2 id="rna-seq-vorgehen-bioinformatik">RNA-Seq: Vorgehen / Bioinformatik</h2>
+<p>Präprozessierung</p>
+<ul>
+<li>Startpunkt: Datei mit gelesenen Sequenzen (&quot;Reads&quot;) vom Sequencer</li>
+<li>Suche für jede Sequenz, wo sie im Genom vorkommt (&quot;Alignment&quot;)</li>
+<li>Zähle für jedes Gen, wie viele Reads auf dieses Gen gefallen sind</li>
+</ul>
+<p>Führe all dies für jede Probe durch</p>
+<p>Ergebnis: Eine Matrix</p>
+<ul>
+<li>mit einer Spalte für jede Probe</li>
+<li>einer Zeile für jedes Gen</li>
+<li>Zahlen, die angeben, wie viele Reads in der Probe auf das Gen gefallen sind</li>
+</ul>
+<h2 id="fastq-datei">FASTQ-Datei</h2>
+<p>So kommen die Daten aus dem Sequenzierer:</p>
+<pre><code>@SRR001666.1 071112_SLXA-EAS1_s_7:5:1:817:345 length=72
+GGGTGATGGCCGCTGCCGATGGCGTCAAATCCCACCAAGTTACCCTTAACAACTTAAGGGTTTTCAAATAGA
++SRR001666.1 071112_SLXA-EAS1_s_7:5:1:817:345 length=72
+IIIIIIIIIIIIIIIIIIIIIIIIIIIIII9IG9ICIIIIIIIIIIIIIIIIIIIIDIIIIIII&gt;IIIIII/
+@SRR001666.2 071112_SLXA-EAS1_s_7:5:1:801:338 length=72
+GTTCAGGGATACGACGTTTGTATTTTAAGAATCTGAAGCAGAAGTCGATGATAATACGCGTCGTTTTATCAT
++SRR001666.2 071112_SLXA-EAS1_s_7:5:1:801:338 length=72
+IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII6IBIIIIIIIIIIIIIIIIIIIIIIIGII&gt;IIIII-I)8I</code></pre>
+<p>Jeder Read hat 4 Zeilen: - '@', gefolgt vom Namen (ID) des Reads - die gelesene DNA-Sequenz - '+', evtl. gefolgt nochmals vom Namen - der &quot;Quality string&quot;, der kodiert anzeigt, wie klar das Signal bei der Sequenzierung war</p>
+<h2 id="typische-reads">Typische Reads</h2>
+<ul>
+<li>mRNA wird meist auf 300 bis 500 base pairs (bp) fragmentiert</li>
+<li>von der so entstandenden cDNA liest der Sequenzierer 50, 75, 100, oder 150 bp vom 5'-Ende aus</li>
+<li>falls gewünscht, kann auch noch vom 3'-Ende aus gelesen werden (&quot;paired end sequencing&quot;)</li>
+<li>die Mitte kann nicht gelesen werden</li>
+</ul>
+<h2 id="anzahl-reads-multiplexing">Anzahl Reads, Multiplexing</h2>
+<ul>
+<li>Eine Flow-cell hat 8 Lanes, die getrennt befüllt werden können</li>
+<li>Jede Lane produziert bis to 250 Millionen Reads</li>
+<li>Um in einer Lane mehrere Proben zu mischen, kann man Multiplex-Tags verwenden</li>
+</ul>
+<h2 id="alignment-referenz-genom">Alignment: Referenz-Genom</h2>
+<ul>
+<li>Für die meisten Modellorganismen ist ein Referenz-Genom verfügbar, z.B. auf https://www.ensembl.org/info/data/ftp/index.html</li>
+<li>Für den Menschen beginnt die Datei &quot;Homo_sapiens.GRCh38.dna.toplevel.fa.gz&quot; so</li>
+</ul>
+<pre><code>&gt;1 dna:chromosome chromosome:GRCh38:1:1:248956422:1 REF
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+[...]
+GCTGAGGCAGGAGAATCGCTTGAATCCGGGAGGCGGAGGTTGCAGTGAGACAAGATCATG
+CCACCACACTCCAGTCTGGGTGACAGAGCGAGACCCTGTCTCAAAAAAAAAAAAAAAGGC
+CGGGCTCAGTGGCTCACGCCCAGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGTGGATC
+ACGAGGTCAGGAGATCTAGACCATCCTGGCTAACACGGTGAAACCCCGTCTCTACTAAAA
+ATACAAAAAAAATAGCCAGGCATTGTAGCGGGCACCTGTAGTCCCAGCTACTCGGGAGGC
+TGAGGCAGAAGAATGGCGTGAACCCAGAAGGCGGAGCTTGCAGTGATCCGAGATGCCGCC
+ACTGCACTCCAGCCTGGGGGACAGAGCGAGACTCCGTCTAAAAAAAAAAAAATTAAATCA
+CATGTAATTGTCTGTTTGGGCCCCCACTGATCACCACTTCTAAGGGGGGGCTCTTCTCTG
+GAACAACCGTGTATAGGTCCCCATTCCCACGGCAATGCTTTGAGGGGCTTTTTGCCTGGG
+CTCTGGCTGCTCCCTGGCCCCTCCACTCAGCGACTTCCCTCCCCTCCCCTCTCGGCTCCA
+GCACATCATCTTCTGTTTGGGCTTTTCCTCCGGTTGCTCCCTCCATGTTCCCCCCCGCCT
+TTTCTCCCAACACCAGCTCCCACTTCCCCTTCCTTAGTGGAGTAGGTAAGAGCAGACCGC
+CTGGTTTCAAGTCCTGGCCGTGCCATTTCCTAGCATCTAGCAGTGAGAACTTGGGCAAGT
+TCTTCCCTTCTCAATGCCTCAATTTCCTCAACTGTAAAAGGGGAATACTAGCAGTTCCTA
+GCTCACAGGGTTGTTTGAGGATGGAAAGGTATTAAAAAGCCTTACGGGGCCTTAGCTCTT
+TAATTTGGCTTGTAGTAAGCACACAAAAGTGGTTATTATTATTATATTATTTTAGAGATA
+GGGATGATTTTAGAATGCAGTAGCACGATCATTGTGCGCTACAGTTTCAAACTCCTGGGC
+[...]
+&gt;2 dna:chromosome chromosome:GRCh38:1:1:248956422:1 REF</code></pre>
+<ul>
+<li><p>Wir haben Sequenzen für alle 22 Autosomen, die beiden Sex-Chromosomen X und Y, die mitochondriale DNA (&quot;MT&quot;) und einige sog. &quot;nicht-chromosomale Contigs&quot;.</p></li>
+<li><p>In den Chromosomen fehlt Sequenz an den Enden (Telomere) und teils in der Mitte (Zentromer).</p></li>
+<li><p>Das Referenz-Genom wird alle paar Jahre überarbeitet. Dies hier ist das Assembly &quot;GRCh38&quot;, d.h. Version 38 des <em>h</em>umanen Referenz-Genoms, herausgegeben vom Genome Reference Consortium (GRC) im Dezember 2013.</p></li>
+</ul>
+<h2 id="alignment-gen-modelle">Alignment: Gen-Modelle</h2>
+<p>Wir müssen auch wissen, wo in diesen langen Sequenzen die Gene liegen.</p>
+<p>Im EnsEMBL-Gen-Browser können wir uns das ansehen: https://www.ensembl.org/Homo_sapiens/Location/View?r=17:63992802-64038237</p>
+<p>Die Koordinaten können wir auch herunterladen, zB als GTF-Datei.</p>
+<pre><code>#!genome-date 2013-12
+#!genome-build-accession NCBI:GCA_000001405.28
+#!genebuild-last-updated 2019-06
+1       havana  gene    11869   14409   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;;
+1       havana  transcript      11869   14409   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; transcript_id &quot;ENST00000456328&quot;; transcript_version &quot;2&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;; transcript_name &quot;DDX11L1-202&quot;; transcript_source &quot;havana&quot;; transcript_biotype &quot;lncRNA&quot;; tag &quot;basic&quot;; transcript_support_level &quot;1&quot;;
+1       havana  exon    11869   12227   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; transcript_id &quot;ENST00000456328&quot;; transcript_version &quot;2&quot;; exon_number &quot;1&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;; transcript_name &quot;DDX11L1-202&quot;; transcript_source &quot;havana&quot;; transcript_biotype &quot;lncRNA&quot;; exon_id &quot;ENSE00002234944&quot;; exon_version &quot;1&quot;; tag &quot;basic&quot;; transcript_support_level &quot;1&quot;;
+1       havana  exon    12613   12721   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; transcript_id &quot;ENST00000456328&quot;; transcript_version &quot;2&quot;; exon_number &quot;2&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;; transcript_name &quot;DDX11L1-202&quot;; transcript_source &quot;havana&quot;; transcript_biotype &quot;lncRNA&quot;; exon_id &quot;ENSE00003582793&quot;; exon_version &quot;1&quot;; tag &quot;basic&quot;; transcript_support_level &quot;1&quot;;
+1       havana  exon    13221   14409   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; transcript_id &quot;ENST00000456328&quot;; transcript_version &quot;2&quot;; exon_number &quot;3&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;; transcript_name &quot;DDX11L1-202&quot;; transcript_source &quot;havana&quot;; transcript_biotype &quot;lncRNA&quot;; exon_id &quot;ENSE00002312635&quot;; exon_version &quot;1&quot;; tag &quot;basic&quot;; transcript_support_level &quot;1&quot;;
+1       havana  transcript      12010   13670   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; transcript_id &quot;ENST00000450305&quot;; transcript_version &quot;2&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;; transcript_name &quot;DDX11L1-201&quot;; transcript_source &quot;havana&quot;; transcript_biotype &quot;transcribed_unprocessed_pseudogene&quot;; tag &quot;basic&quot;; transcript_support_level &quot;NA&quot;;
+1       havana  exon    12010   12057   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; transcript_id &quot;ENST00000450305&quot;; transcript_version &quot;2&quot;; exon_number &quot;1&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;; transcript_name &quot;DDX11L1-201&quot;; transcript_source &quot;havana&quot;; transcript_biotype &quot;transcribed_unprocessed_pseudogene&quot;; exon_id &quot;ENSE00001948541&quot;; exon_version &quot;1&quot;; tag &quot;basic&quot;; transcript_support_level &quot;NA&quot;;
+1       havana  exon    12179   12227   .       +       .       gene_id &quot;ENSG00000223972&quot;; gene_version &quot;5&quot;; transcript_id &quot;ENST00000450305&quot;; transcript_version &quot;2&quot;; exon_number &quot;2&quot;; gene_name &quot;DDX11L1&quot;; gene_source &quot;havana&quot;; gene_biotype &quot;transcribed_unprocessed_pseudogene&quot;; transcript_name &quot;DDX11L1-201&quot;; transcript_source &quot;havana&quot;; transcript_biotype &quot;transcribed_unprocessed_pseudogene&quot;; exon_id &quot;ENSE00001671638&quot;; exon_version &quot;2&quot;; tag &quot;basic&quot;; transcript_support_level &quot;NA&quot;;</code></pre>
+<p>Wir finden dort u.a. folgende genetische Features:</p>
+<ul>
+<li>Gen</li>
+<li>Transcript</li>
+<li>Exon</li>
+</ul>
+<p>jeweils mit Chromosom, Start und Ende, Strang (&quot;strand&quot;), Ensembl-Gen-ID, Transkript-ID, Gene-Name usw.</p>
+<p>Ein Gen hat ein oder mehrere Transkripte, ein Transkript ein oder mehrere Exons.</p>
+<p>Es ist wichtig, dass die Koordinaten in der GTF-Datei zum Refernz-Genom passen</p>
+<h2 id="aligner">Aligner</h2>
+<p>Ein &quot;Aligner&quot; ist ein Software-Tool, das zu jedem Read aus einer FASTQ-Datei alle Stellen im Genom findet, die mit dem Read übereinstimmt.</p>
+<p>Der Aligner muss mit Mismatches und Gaps zurecht kommen:</p>
+<ul>
+<li>Mismatch durch Lesefehler: der Sequenzierer hat eine Base falsch gelesen</li>
+<li>Mismatch durch SNP (single nucleotide polymorphism): Das Individuum, von dem die Probe stammt, hat an dieser Stelle eine andere Base als das Refernz-Genom</li>
+<li>Gap durch &quot;structural variant&quot;: Das individualle Genom hat hier, im vergelich zum Referenz-Genom, extra Sequenz, oder es fehlt Sequenz (oder ist woanders)</li>
+<li>Gap durch Intron: das gelesene RNA-Fragment ersteckt sich über mehrere Exons und die Spleiß-Stelle (&quot;splice site&quot;) dazwischen</li>
+</ul>
+<p>Der Aligner produziert als Ausgabe eine SAM-Datei:</p>
+<pre><code>SRR1039508.7385773  99  1   11357650    255 63M =   11357703    116 GTCAGGAGAGCCAAGCCTGGCTGTGCTGAGATCAGAATCCTGGTGGGGTGACTATGAAAAAGT HHIIJJIJHIIJJIJJJJJJIJJBGGIJHHHIJJJJJJJJJJJFHIJJ:@BFFFEDEEDDBDD NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.1016320  83  1   11357661    255 63M =   11357647    -77 CAAGCCTGGCTGTGCTGAGATCAGAATCCTGGTGGGGTGACTATGAAAAAGTTGGGGTCTTGG DCECFFFFHHHHIGHIHIJJGJJJJIGJHHJHHJIIJIGDIIJJJJJIHGIJJJJIHIJJJHF NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.7385773  147 1   11357703    255 63M =   11357650    -116    ATGAAAAAGTTGGGGTCTTGGCCTTGGGGTCAAAGATTGTCAAGGTGACTTCTCATTCGAATG FEFFHHHHHIJJJJJJJJJJJJIIHJJJJJJJJJJJIJJJJJJJJJGHJJJJJJJJJJJJJJH NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.6638971  163 1   11357717    255 63M =   11357752    98  GTCTTGGCCTTGGGGTCAAAGATTGTCAAGGTGACTTCTCATTCGAATGCTTCACAGCCCTGG H?EFGGIJGGIJICHFHGGGIHGGHHIJJJIGHEGIIJFHHGGIDCHHIFHIJJFEFEEFFFD NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.6638971  83  1   11357752    255 63M =   11357717    -98 TTCTCATTCGAATGCTTCACAGCCCTGGAGGCTTGACAGTTGAGAATGCGCTGAAGAAGTCCT FFFDHHCAGHJHIGEAGGJIGCHEIHDGGGGGIJIHDGGHHBFDHGBIHGHEIIGJJJJIIGG NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.19692638 99  1   11358809    255 63M =   11358877    131 CCTGGTAAAGCCATCTCAATGTCTAGACAAGCAGTCTCCATGCAGCTCCAAGGAGGATAAGGG HJJJJJIJJIJJJJIJJJJJJIIIJJHIJIJJJJJJJJIIJJJJJJJJJJJJJHHHFFFFFFE NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.19692638 147 1   11358877    255 63M =   11358809    -131    CACAGAGGGCTGTGAGCAGAGGGTTGCTCAGAGCCCCTCCTGACGGAGGCGAGGAGGAGGTGG DDDDDDDDDDDDDEEEEEDFFFFHEHHHJJJIJJJJIGJHEIHJJJIIIGJIJJJJJJJJJJH NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.12553251 99  1   11359177    255 63M =   11359278    164 CCCTGCCCTGGAAACCCCACTGCCTGCCCTGGGTCATCCTTGATACTCATTCCCTTGTTTCTC FHIGGH&gt;GCGBFGGCEH)0:B9DBFGDGHHIHI==F9@@;CE@;)7CE?A&gt;=?A@?C;);A&gt;; NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.12553251 147 1   11359278    255 63M =   11359177    -164    AACCACAGTCACAGTGAGAGCCACCAGACGCTGGATCCGGGCAGCAACTTGGGGTTCACTGAA ##DC@EEEDA&gt;@DFCFEDACACCIHJHGIGIGGDFAHIIGIHACBBCIHEIGGGCEHFIHGHD NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.20158710 99  1   11362260    255 63M =   11362290    93  AGAAGGAATGCTGGGGACCTCTGGTCTTCTGCCTGGACTGCCAGAGTTTGGAAGATTGGATGA HJJJJJJJJJJJJJJJJJIJIJJJIJJJJJJJJJJJHIJJJJIJHIHIJJJGGGHIJHHHHHF NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.20158710 147 1   11362290    255 63M =   11362260    -93 GCCTGGACTGCCAGAGTTTGGAAGATTGGATGAGGTCAAGGGCTGATGAGATCAAGGTCTTTT EHHJIJJJJJJJJJJJIJJJJJJIHJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJH NH:i:1  HI:i:1  AS:i:124    nM:i:0
+SRR1039508.3262417  99  1   11364685    255 40S23M  =   11364733    111 CACTCAGTGACATTTTCTCTTCTTTCATCAAAATTGTCCAGGTGAGCCACTGTGCCCAGCACC HBGBBEEFAFFGIIGGG9??FHBD&gt;&lt;??9CBB@DGFB?DHB?0?@DHI38=F@@:CCHCDHE9 NH:i:1  HI:i:1  AS:i:84 nM:i:0
+SRR1039508.3262417  147 1   11364733    255 63M =   11364685    -111    CCCCGGCCCACCTGGACAATTTTGATGAAAGAAGAGAAAATGTCACTGAGTGGGTGTGGGAAG ##########@;@===B3DCF??HDG&gt;HEHFBBGFBCFEHGGHFDBHBAF;IGGFIHECEFE: NH:i:1  HI:i:1  AS:i:84 nM:i:0
+SRR1039508.8889620  163 1   11365866    255 63M =   11365987    184 CTCCTCACTTCTCAGACGGGGTGGCTGCCGGGCGGAGGGGCTCCTCACTTCTCAGACAGGGCG HIGIGIEHGIIIJJIJJGGIJ5ABDFDCCD?BBDD&lt;BDDBDDDDCDDBCCDCDCDCAB&lt;@@BB NH:i:1  HI:i:1  AS:i:120    nM:i:2
+SRR1039508.8889620  83  1   11365987    255 63M =   11365866    -184    TCACCTCCCAGACGGGCTCGCGGCCGGGCAGAGGTGCTCCTCACATCCCAGACGGGGCGGCGG AB?DDDDDDDBBDDBDDDDDDDDDDDEFFFFFHHHHJJJJGHDJJIJJJIHEJIJJJJJJJJH NH:i:1  HI:i:1  AS:i:120    nM:i:2</code></pre>
+<p>Mit einem Alignment-Browser, z.B. IGV (Integrated Genome Viewer) können wir uns das grafisch einzeigen lassen.</p>
+<h2 id="information-aus-rna-seq">Information aus RNA-Seq</h2>
+<p>Aus RNA-Seq-Daten können wir entnehmen:</p>
+<ul>
+<li>welche Teile des Genoms transkribiert werden (wo Gene sind)</li>
+<li>wie stark jedes Gen exprimiert ist</li>
+<li>welche Isoforme der Gene exprimiert wurden</li>
+<li>ob SNPs in Genen vorliegen oder gar RNA-Editing stattgefunden hat</li>
+<li>ob Fusionsgene vorliegen</li>
+</ul>
+<h2 id="gen-expression">Gen-Expression</h2>
+<p>Meist beschränkt man sich darauf, einfach für jedes Gen zu zählen, wie viele Reads auf es gemappt wurden.</p>
+<p>Man betrachtet dies als Maß der Gen-Expression</p>
+<p>Aber:</p>
+<ul>
+<li>Die Zahl is proportional zur Anzahl der vorhandenen mRNA-Moleküle.</li>
+<li>Dies hängt von der Aktivität von Transkription und Degradation ab,</li>
+<li>außerdem von der Transkript-Länge und der PCR-Effizienz</li>
+<li>und der Gesamtzahl der von der Probe gelesenen Reads.</li>
+<li>mRNA von coding genes hat keinen direkten Effekt: sie muss translatiert werden, um Proteine zu erzeugen</li>
+<li>Die Translations-Effizienz ist sehr variabel</li>
+</ul>
+<p>Daher: - Expressionsstärke per se sagt wenig aus über die biologische Wirkung.</p>
+<h2 id="differenziell-exprimierte-gene">Differenziell exprimierte Gene</h2>
+<p>Gerne vergleicht man mehrere Proben-Gruppen (z.B., Proben von kranker und gesunder Haut)</p>
+<ul>
+<li>Das Verhältnis der Expression zwischen den Gruppen (&quot;ratio&quot; oder &quot;fold change&quot;) is meist informativer als der absolute Wert.</li>
+<li>Verhältnisse visualisiert man immer mit logarithmischer Achse! Daher: &quot;log fold change&quot; (LFC)</li>
+<li>Der Unterschied muss statistisch signifikant sein.</li>
+<li>Die Verhältnisse werden sehr ungenau, wenn man wenige Reads hat (Poisson-Rauschen)</li>
+</ul>
+<h2 id="psoriasis">Psoriasis</h2>
+<p>Unser Beispiel-Datensatz stammt von diesem Artikel:</p>
+<p>Li et al.: <em>Transcriptome Analysis of Psoriasis in a Large Case-Control Sample: RNA-Seq Provides Insights into Disease Mechanisms.</em> Journal of Investigative Dermatology, 134:1828 (2014). doi:10.1038/jid.2014.28</p>
+<p>Er enthält - 95 Proben von krankhafter Haut von 92 Patienten mit Psoriasis (&quot;cases&quot;) - 84 Proben von normaler Haut von 82 gesunden Personen zum Vergleich (&quot;controls&quot;)</p>
+<h2 id="unsere-analyse-bisher">Unsere Analyse bisher</h2>
+<p>Normalisierung: - Wir haben die Count-Matrix von ReCount2 heruntergeladen. - Für jede Probe haben wir die Gesamtzahl an Reads (&quot;totals&quot;) zusammen gerechnet. - Dann haben wir die Zahlen (&quot;counts&quot;) durch diese totals geteilt und mit 10^6 multipliziert. - Nun haben wir &quot;reads per million&quot; oder &quot;fragments per million&quot; (FPM)</p>
+<p>Normalisieren = Ausgleichen technisch bdingter Unterschiede zwischen Meßwerten, um vergleichbarkeit herzustellen</p>
+<p>Vergleich zwischen Cases und Controls - Für jedes Gen haben wir den Mittelwert über alle Cases und über alle Controls gebildet. - Das Verhältnis dieser Mittelwerte haben wir dann gegen den Gesamt-Mittelwert geplottet:</p>
+<div class="figure">
+<img src="MAplot.png" />
+
+</div>
+<p>Statistische Signifikanz:</p>
+<p>Dann haben wir die Zuordnung der Proben zu den Labels &quot;case&quot; und &quot;control&quot; permutiert (durcheinander gewürfelt), und nochmals die Mittelwerte berechnet und durcheinander geteilt:</p>
+<p>Hier sind die Expressions-Verhältnisse aus dieser Permutations-Null in Violett über den echten Werten geplottet:</p>
+<div class="figure">
+<img src="MAplot2.png" />
+
+</div>
+<p>Die grünen Linien markieren einen Bereich, in dem sich wenig Null-Punkte befinden, nämlich Verhältnis &gt;2 oder &lt;1/2, und mittlere Expression &gt; 0.01 FPM.</p>
+<p>In diesem &quot;grünen Bereich&quot; sind 6754 echte (schwarze) Punkte, und nur 119 verwürfelte (lila) Punkte.</p>
+<p>Wenn wir diese 6754 Gene als unsere differenziell exprimierten Gene (DGEs) betrachten, so wird diese Liste zwar einige Falsch-Positive enthalten, aber der Anteil dieser Falsch-Positiven, die &quot;false discovery rate&quot; (FDR) ist wohl unter 2%, denn 119/6754=0.018.</p>
+<h2 id="eine-interaktive-app-zur-daten-exploration">Eine interaktive App zur Daten-Exploration</h2>
+</body>
+</html>
