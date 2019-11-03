@@ -1,0 +1,194 @@
+---
+title: "Lösungen Hausaufgabe 3"
+output: html_notebook
+---
+
+# Setup
+
+Als erstes lesen wir die Daten ein und laden die benötigten Packages.
+Die folgenden Schritte vollziehen die Prozessierung während der Vorlesung nach.
+
+```{r echo=TRUE}
+library(tidyverse)
+
+read_tsv( "http://duffel.rail.bio/recount/v2/SRP035988/counts_gene.tsv.gz" ) ->  countsWide
+read_tsv( "gene_ids.tsv" )-> genes
+colnames(genes) <- c("gene_id", "name", "description")
+
+read_tsv( "http://duffel.rail.bio/recount/SRP035988/SRP035988.tsv" ) %>%
+  select( sample = run, subject = title, condition = characteristics ) %>%
+  mutate( condition = fct_recode( condition,
+    "normal" = "tissue type: normal skin",
+    "psoriatic" = "tissue type: lesional psoriatic skin" ) ) -> sampleTable
+
+countsWide %>%
+  gather( sample, count, -gene_id ) -> countsLong
+
+countsLong %>%
+group_by( sample ) %>%
+summarize( total = sum( count ) ) -> totals
+
+countsLong %>%
+  mutate( gene_id = str_remove( gene_id, "\\.\\d+")) %>%
+  left_join( totals ) %>%
+  mutate( tpm = count / ( total / 1000000 ) ) %>%
+  select( gene_id, sample, tpm ) -> tpmTable
+
+tpmTable %>%
+  left_join( sampleTable ) %>%
+  group_by( gene_id, condition ) %>%
+  summarize( mean_tpm = mean( tpm ) ) -> a
+
+a %>% 
+  spread( condition, mean_tpm ) %>%
+  left_join( genes ) -> resultTable
+
+head(resultTable)
+```
+
+# 1. Womit "beschäftigen" sich gesunde Hautzellen?
+
+> Sortieren Sie Tabelle nach Expressions-Stärke in normaler Haut. Sehen Sie sich die 50 am stärksten exprimierten Gene an. Schlagen Sie einige dieser Gene in einem Lehrbuch (oder einfach auf Wikipedia) nach. Zu welchen biologischen Prozessen gehören diese? Welche "Themen" finden Sie mehrfach unter diesen Genen?
+
+Für diese Aufgabe nutzen wir die `resultTable` Tabelle, da hier bereits die nötigen Werte eingetragen sind:
+```{r echo=TRUE}
+resultTable %>% 
+  arrange(desc(normal)) %>%  ## arrange sortiert normalerweise aufsteigend, desc --> "descending"
+  head(n=50)
+```
+
+Wie die Gennamen bereits andeuten, sind Gene die in normalen Hautzellen exprimiert werden, für die Produktion extrazellulärer Matrix Proteine (Keratine und Collagene) verantwortlich.
+Des Weiteren tauchen viele mitochondriale Gene auf ("MT-").
+Diese Gene zu finden ist nichts ungewöhnliches.
+
+# 2. Welche Gene sind bei Psoriasis extrem dysreguliert?
+
+> Sehen Sie sich nun die Gene an, die bei Psoriasis um ein Vielfaches stärker exprimiert sind als bei gesunder Haus. Sortieren Sie dazu nach dem Expressions-Verhältnis krankhaft / normal. Ignorieren Sie sehr schwach exprimierte Gene (mit mittlerer Expression unter 0.01 TPM), da beiden diesen das Verhältnis zu ungenau ist. Wenn Sie sich die Gene mit über 30-facher Überregulation (und mindestens 0.01 TPM Expression) ansehen, welche "Themen" finden Sie diesmal?  
+
+```{r echo=TRUE}
+resultTable %>% 
+  filter(psoriatic >= .01 & normal >= .01) %>% 
+  mutate(fold_change = psoriatic / normal) %>% 
+  filter(fold_change >= 30) %>% 
+  arrange(desc(fold_change))
+```
+
+> Können Sie auch etwas zu den Genen sagen, die bei Psoriasis viel schwächer exprimiert werden als in geunder Haut?
+
+```{r echo=TRUE}
+resultTable %>% 
+  filter(psoriatic >= .01 & normal >= .01) %>% 
+  mutate(fold_change = normal / psoriatic) %>% 
+  arrange(desc(fold_change))
+```
+
+# 3. Wie viele Probanden braucht man für solch eine Studie?
+
+> Die Autoren dieser Studie haben 174 Teilnehmer rekrutiert. Das war sicher ein erheblicher Aufwand. Wie viel hätte man erkennen können, wenn man eine sehr viel kleinere Kohorte verwendet hätte?
+> 
+> Wählen Sie dazu aus den 179 Proben zufällig oder willkürlich 8 Proben von gesunden Probanden und 8 Proben von psoritaischer Haut aus, berechnen Sie für jedes Gen den Mittelwert über die gesudnen und krankhaften Hautproben, sowie das Verhältnis der beiden Mittelwerte. Vergleichen Sie die Verhältnisse, die Sie nun erhalten haben, mit denen, die wir aus dem vollen Datensatz errechnet haben: Plotten Sie in einem Scatter-Plot (mit einem Punkt für jedes Gen) das Expressions-Verhältnis des vollen Datensatzes auf der x- und das des reduzierten Datensatzes auf der y-Achse. Die Achsen sollten logarithmisch sein. Lassen Sie wie zuvor die schwach exprimierten Gene (mit <0.01 TPM) weg. Gibt es viele Gene, die nun einen sehr anderen Eindruck machen?
+
+Als erstes wäheln wir zufällig 8 Proben je Kondition (gesund / krank) aus.
+Das dplyr Verb `sample_n(n)` wählt je Gruppe `n` Zeilen zufällig aus:
+```{r echo=TRUE}
+set.seed(1234)
+(sampleTable %>% 
+  group_by(condition) %>% 
+  sample_n(8) -> randSamples)
+```
+
+Die Klammern um den oben gezeigten Befehl führen dazu, dass die zufällig gewählten Werte zum einen in der Variablen `randSamples` gespeichert werden, zum anderen aber auch, dass der Inhalt der Variablen ausgegeben wird, damit wir einen Blick darauf werfen können.
+
+Nun vereinen wir den `tpmTable` Data Frame mit den zufällig ausgewählten Proben und filtern nach Zeilen, in welcher eine subject ID vermerkt ist.
+Auf dieser Art und Weise behalten wir nur Expressionswerte von Proben, die wir zuvor ausgewählt hatten.
+
+```{r echo=TRUE}
+tpmTable %>% 
+  left_join(randSamples, by = "sample") %>% 
+  filter(!is.na(subject)) -> tpmTableRand
+
+head(tpmTableRand)
+```
+
+Nun gehen wir erst einmal wie zu Beginn und in der Vorlesung vor, um die mittlere Expression eines jeden Genes innerhalb jeder Condition zu berechnen.
+
+```{r echo=TRUE}
+tpmTableRand %>%
+  left_join( sampleTable ) %>%
+  group_by( gene_id, condition ) %>%
+  summarize( mean_tpm = mean( tpm ) ) %>% 
+  spread( condition, mean_tpm ) %>%
+  left_join( genes ) -> resultTableRand
+
+head(resultTableRand)
+```
+
+Nachdem wir diese Werte erhalten, berechnen wir erneut das Expressionsverhältnis aus der Expression erkrankter und gesunder Probanden.
+
+```{r echo=TRUE}
+resultTableRand %>% 
+  mutate(fold_change_rand = psoriatic / normal) %>% 
+  select(gene_id, fold_change_rand) -> fcRand
+
+head(fcRand)
+```
+
+Um nun dieses Ergebnis mit den Verhältnissen des vollen Datensatzes zu vergleichen, kombinieren wir die Tabelle `fcRand` mit dem Data Frame `resultTable`.
+
+```{r echo=TRUE}
+resultTable %>% 
+  mutate(fold_change = psoriatic / normal) %>% 
+  left_join(fcRand, by = "gene_id") -> compFC
+
+# Zur Veranschaulichung zeige ich nur den Head der Tabelle 
+# mit den interessanten Spalten
+
+compFC %>% 
+  select(gene_id, fold_change, fold_change_rand) %>% 
+  head
+```
+
+Man sieht oben bereits, dass sich die Verhältnisse unterscheiden.
+
+Wie in der Aufgabe gefordert, und zur besseren Veranschaulichung, plotten wir nun beide Verhältnisse gegeneinander:
+
+```{r echo=TRUE}
+compFC %>% 
+  filter(normal >= .1 & psoriatic >= .1) %>%  # gene die über .1 TPM in beiden Conditions detektiert wurden
+  ggplot +  # generiere neuen ggplot plot
+  aes( x = fold_change, y = fold_change_rand) +  # x und y Koordinaten Definition
+  geom_point(size=.01) +  # Plotte die Werte als Points mit einer festen Größe von 1% der Standardgröße
+  scale_x_log10() +       # x- und y- Achse sollen log10 skaliert werden
+  scale_y_log10() +       # s.o.
+  coord_fixed() +         # Beide Achsen sollen die gleiche Skalierung aufweisen
+  xlab("Full data fold change") +  # x-Achsen Label
+  ylab("Reduced data fold change") +  # y-Achsen Label
+  geom_abline(slope = 1, intercept = 0, color = "red")  # Hinzufügen der roten Linie, auf welcher die Punkte liegen, 
+                                                        # sollten beide Datensätze die gleichen Effekte zeigen
+```
+
+Wir können auch die Unterschiede zur roten linie etwas einfacher greifbar machen, indem wir das Verhältnis von reduziertem und vollem Datensatz gegen die Messungen des vollen Datensatzes auftragen.
+
+```{r echo=TRUE}
+compFC %>% 
+  filter(normal >= .1 & psoriatic >= .1) %>% 
+  mutate(fcDiff = fold_change_rand / fold_change) %>% 
+  arrange(desc(fcDiff)) %>% 
+  select(gene_id, fold_change, fold_change_rand, fcDiff) %>% 
+  ggplot +
+  aes(x = fold_change, y = fcDiff) +
+  geom_point(size=.1) +
+  scale_x_log10() +
+  scale_y_log10() +
+  geom_abline(slope = 0, color = "red", intercept = 0) +
+  xlab("Fold change full dataset") +
+  ylab("Difference in FC subsampled vs. full")
+```
+
+Wie wir sehen können, befinden sich viele Gene in der Nähe der roten linie, sind also ähnlich zum vollen Datensatz.
+Jedoch gibt es auch viele Gene, deren Unterschied zwischen erkranktem und gesundem Gewebe um bis zu 100-fach in dem reduzierten Datensatz überschätzt und bis zu 10x unterschätzt werden.
+
+```{bash}
+cp HA3_Loesung.nb.html HA3_Loesung.html
+```
+
