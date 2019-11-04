@@ -1,0 +1,50 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<h2 id="übersicht-über-die-r-funktionen-zur-tabellen-manipulation">Übersicht über die R-Funktionen zur Tabellen-Manipulation,</h2>
+<p>die wir in der Vorlesung besprochen haben.</p>
+<p>Um ausführlichere Erklärungen oder Beispiele zu finden, siehe den Code von den Vorlesungen -- oder man googelt einfach nach &quot;R&quot; oder &quot;tidyverse&quot; und dem Funkltionsnamen.</p>
+<h3 id="library-tidyverse">library( tidyverse )</h3>
+<p>Laedt die Tidyverse-Pakete, die viele der folgenden Funktionen bereitstellen</p>
+<h3 id="section">%&gt;%</h3>
+<p>Pipe-Operator: &quot;schiebt&quot; Daten von einem Befehl zum nächsten (oder schiebt Daten aus einer V ariable in einen Befehl)</p>
+<p>Technisches: <code>v %&gt;% f(y)</code> ist eigentlich einfach nur eine alternative Schreibweise von <code>f( x, y)</code>, d.h., das &quot;Hinein-Geschobene&quot; ist das erste Argument von <code>f</code> und <code>y</code> ist das zweite.</p>
+<h3 id="section-1">-&gt;</h3>
+<p>Zuweisungs-Operator: <code>f(x) -&gt; y</code> speichert das Resultat von <code>f(x)</code> in der Variable <code>y</code></p>
+<p>Technisches: Man kann auch <code>y &lt;- f(x)</code> schreiben, oder <code>y = f(x)</code>; dies sind alles alternative Schreibweisung derselben ZUweisungs-Operation</p>
+<h3 id="read_tsv">read_tsv</h3>
+<p>Einlesen einer Daten-Tabelle aus einer Text-Datei. &quot;tsv&quot; steht für &quot;Tab-separated values&quot;. Es gibt auch &quot;csv&quot;, &quot;comma-separated values&quot;, und einiges mehr. Die NHANES-Daten zB lagen in dem wenig bekannten &quot;XPT&quot;-Format vor, dass wir mit <code>read_xpt</code> eingelesen haben.</p>
+<h3 id="select">select</h3>
+<p>wählt Spalten einer Tabelle aus; die übrigen Spalten werden nicht weiter gereicht. Man kann den Spalten auch neue Namen geben. Wenn man den Spaltennamen ein &quot;-&quot; voranstellt, bedeutet das: alle Spalten außer diesen.</p>
+<h3 id="mutate">mutate</h3>
+<p>verändert Spalte der durchgereichten Tabelle, oder fügt eine neue Spalten hinzu. Man gibt eine Rechenoperation an, die die neuen Werte für die Spalte aus den anderen Spalten berchnet, zB: <code>tbl %&gt;% mutate( bmi = weight / height^2 )</code></p>
+<h3 id="fct_recode">fct_recode</h3>
+<p>benennt die Levels in einem Faktor um. Ein Faktor ist eine Spalte mit Strings (Zeichenketten) aus einer vorgegebenen Liste von Levels. Bsp.: Eine Spalte, die nur die Werte &quot;male&quot; und &quot;female&quot; enthält. Rekodieren heisst, diese Werte durch andere (zB &quot;Mann&quot; und &quot;Frau&quot;) zu ersetzen.</p>
+<p>Beispiel: <code>tbl %&gt;% mutate( sex = fct_recode( sex, &quot;Mann&quot;=&quot;male&quot;, &quot;Frau&quot;=&quot;female ) )</code></p>
+<p>Hier verändern wir mit <code>mutate</code> die Spalte <code>sex</code>. Die neuen Werte enstehen aus den alten Werten durch Umkodierung: &quot;male&quot; wird durch &quot;Mann&quot; ersetzt und &quot;female&quot; durch &quot;Frau&quot;.</p>
+<h3 id="filter">filter</h3>
+<p>wählt bestimmte Zeilen aus und verwirft die anderen. Beispiel: <code>tbl %&gt;% filter( age &gt;= 18 )</code> behält nur die Tabellen-Zeilen bei, in denen der Wert in der Spalte <code>age</code> mindestens 18 ist.</p>
+<p>Mehrere Filter-Kriterien können durch ein Komma oder ein <code>&amp;</code>-Zeichen (beides für &quot;und&quot;) oder durch ein <code>|</code>-Zeichen (für &quot;oder&quot;) verknüpft werden</p>
+<h3 id="group_by">group_by</h3>
+<p>fasst die Zeilen der Tabelle zu Gruppen zusammen. Beispiel: <code>tbl %&gt;% group_by( sex )</code> ordnet die Zeilen in zwei Gruppen, die Zeilen mit <code>sex==&quot;male&quot;</code> und die mit <code>sex==&quot;female&quot;</code>. Alle folgenden Operation (z.B. Mittelwerte) werden nun für jede Gruppe getrennt durch geführt.</p>
+<h3 id="summerise">summerise</h3>
+<p>Fasst alle Zeilen einer Gruppe zu einer einzigen Zahl (z.B. ein Mittelwert) zusammen.</p>
+<p>Beispiel: <code>tbl %&gt;% group_by( sex ) %&gt;% summarise( mean_height = mean(height) )</code> berechnet den Mittelwert (<code>mean</code>) der Werte in der Spalte <code>height</code>, getrennt für die Werte mit <code>sex==&quot;male&quot;</code> und <code>sex==&quot;female&quot;</code></p>
+<p>Nützliche Funktionen, die man in <code>summerise</code> verwenden kann, sind zB <code>mean</code> (Mittelwert), <code>sum</code> (Summe), <code>var</code> (Varianz), <code>sd</code> (Standardabweichung), <code>n</code> (Anzahl) usw.</p>
+<h3 id="left_join-und-inner_join">left_join und inner_join</h3>
+<p>fügt zwei Tabellen zusammen: an jede Zeile der linken Tabelle wird die passende Zeile der rechten Tabelle angefügt. Die linke Tabelle ist dabei diejenige, die über <code>%&gt;%</code> in den Befehl hineingeschoben wurde (oder die zuerst angeben wird, wenn man keine <code>%&gt;%</code>-Pipe verwendet), die rechte Tabelle die, die in den Klammern nach <code>left_join</code> angegeben ist (oder die zweite der beiden Tabellen zwischen den Klammern, falls kein <code>%&gt;%</code> verwendet wurde). Dass Zeilen zusammen gehören, wird daran erkannt, dass ihre Werte übereinstimmen in all den Spalten, die in beiden Tabellen vorkommen. Mit dem <code>by</code>-Argument kann man explizit angeben, welche Spalten abgeglichen werden sollen. Wenn in der rechten Tabelle keine passende Zeile gefunden wird, werden die Felder als fehlend (markiert mit <code>NA</code>, für &quot;not available&quot;) angefügt. Falls in der rechten Tabelle mehrere passende Zeilen gefunden werden, wird die Zeile in der linken Tabelle vervielfacht. Neben <code>left_join</code> gibt es auch noch <code>inner_join</code>, dass die Zeilen weglässt, die nicht in beiden Tabellen gefunden werden (statt <code>NA</code>s zu setzen), und ein paar weitere join-Arten.</p>
+<h3 id="gather">gather</h3>
+<p>wandelt eine &quot;breite&quot; Tabelle in eine &quot;lange&quot; Tabelle um. Dabei gibt man erst die Namen der zwei neuen Spalten an, die man erhalten möchte (Schlüssel- und Werte-Spalte), und listet dann die Spalten, die man &quot;einsammeln&quot; möchte. Danach enthält die Schlüssel-Spalte , was vorher dir Überschriften der eingesammelten Spalten waren, und die Werte-Spalte die Werte in den eingesammelten Spalten. Beispiel: <code>countsWide</code> zu <code>countsLong</code> in unserem Psoriasis-Beispiel. Beim Angeben der einzusammelnden Spalten hilft oft die Minus-Syntax: anstatt der einzusammelnden Spalten gibt man die andern Spalten an, mit Minuszeichen vor dem Namen. Das Minuszeichen bedeutet &quot;alle Spalten außer diesen&quot;.</p>
+<h3 id="spread">spread</h3>
+<p>die umgekehrte Operation zu gather: Man gibt eine Schlüssel- und eine Werte-Spalte an: Für jedes Level in der Schlüssel-Spalte wird eine neue Spalte angelegt, mit dieser Überschrift, und die Werte aus der Werte-Spalte werden darunter verteilt.</p>
+<h3 id="head-und-tail">head und tail</h3>
+<p>'head<code>behält nur die ersten 10 Zeilen (oder die ersten *n* Zeilen, für</code>head(n)<code>). Das iost nützlich, um zu verhindern, dass die vielen Zeilen eine langen Tabelle den Bildschirm verstopfen. Ebenso gibt es</code>tail`, um einen Blick auf die letzten 10 Zeilen zu werfen.</p>
+</body>
+</html>
