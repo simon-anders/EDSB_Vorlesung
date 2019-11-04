@@ -87,6 +87,6 @@ die umgekehrte Operation zu gather: Man gibt eine Schlüssel- und eine Werte-Spa
 
 ### head und tail
 
-'head` behält nur die ersten 10 Zeilen (oder die ersten *n* Zeilen, für `head(n)`). Das iost nützlich, um zu verhindern, dass die vielen Zeilen eine langen Tabelle den Bildschirm verstopfen. Ebenso gibt es `tail`, um einen Blick auf die letzten 10 Zeilen zu werfen.
+`head` behält nur die ersten 10 Zeilen (oder die ersten *n* Zeilen, für `head(n)`). Das iost nützlich, um zu verhindern, dass die vielen Zeilen eine langen Tabelle den Bildschirm verstopfen. Ebenso gibt es `tail`, um einen Blick auf die letzten 10 Zeilen zu werfen.
 
 
