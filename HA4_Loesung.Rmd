@@ -1,0 +1,168 @@
+---
+title: "Vorlesung Data Science"
+output:
+  html_document:
+    df_print: paged
+
+---
+
+## Lösung zur Hausaufgabe der 4. Woche
+
+(Hier noch ohne Code.)
+
+### Aufgabe 1
+
+```{r echo=FALSE} 
+library(knitr)
+opts_chunk$set( echo=FALSE, warning=FALSE, message=FALSE )
+```
+
+Wir laden die Expressionsdatei aus dem "Supplementary Data 2" des Papers von Brawand et al.
+
+```{r}
+library( tidyverse )
+read_tsv( "~/tmp/Human_Ensembl57_TopHat_UniqueReads.txt" ) -> humanMatrix
+
+humanMatrix
+```
+
+Um die Matrix zu finden, laden Sie die Zip-Datei mit den Daten von der Webseite mit dem Nature-Artikel herunter und entpacken sie. Die datei mit den Daten ist wieder eine Textdatei mit einer Tabelle im "tab separated values"-Format (TSV), wie inder Vorlesung besprochen. Verwenden Sie also `read_tsv` (oder den "Import Dataset"-Knopf [und dort "readr"] im Environment-Panel von RStudio).
+
+### Aufgabe 2
+
+Für Aufgabe 2 können wir direkt zwei Spalten gegeneinander plotten:
+
+```{r}
+ggplot( humanMatrix ) +
+  geom_point( aes( x=Human_Heart_Male1, y=Human_Kidney_Male1 ), size=.3, alpha=.3 ) +
+  scale_x_log10() + scale_y_log10() + coord_fixed()
+```
+
+Tips, um zu diesem Plot zu kommen: Wir man zwei Tabellen-Spalten in einem xy-Scatter-Plot gegeneinander aufträgt, haben wir nun oft gesehen. Das gelingt Ihnen sicher. 
+
+Beachten Sie, dass die Achsen logarithmisch sind. Wie macht man das? Fragen Sie Google (zB nach "ggplot loagrithmic axes"), wenn Sie es nichtv wissen. Schauen Sie auch nach Beispielen zu `geom_point`, um zu lernen, wie sie die Punkte eher klein und leicht durchscheinend machen.
+
+Die Gene, die nach rechts unten aus der dicken "Punkt-Wolke" heraus stehen, sind sicher gute Kandidaten für Gene, die im Herz stärker exprimiert sind als in der Niere. Übersehen Sie dabei nicht die Punkte ganz unten, bei denen "Kidney" null ist. 
+
+
+Wir berechnen das Verhältnis der Expressionswerte, Herz geteilt durch Niere, und finden die 20 höchsten Werte. Dabei verwenden wir besser nur die Werte, bei denen nicht nur das Verhältnis hoch ist, sondern auch der Wert für Herz selbst nicht zu niedrig ist. (Warum braucht man das?) Ich filtere hier auf "Herz > 100"
+
+```{r}
+humanMatrix %>%
+  filter( Human_Heart_Male1 > 100 ) %>%
+  mutate( ratio = Human_Heart_Male1 / Human_Kidney_Male1 ) %>%
+  arrange( desc(ratio), desc(Human_Heart_Male1) ) %>%
+  select( GeneID, Human_Heart_Male1, Human_Kidney_Male1, ratio ) %>%
+  head( 20 ) -> heartHigh
+
+heartHigh
+```
+
+Welche Tidyverse-Verben brauchen wir hier? Zunächst `filter`, um die Bedingung "Herz > 100" zu erhalten. Dann `mutate`, um die neue Spalte `ratio` hinzuzufügen, die wir erhalten, indem wir die zwei Spalten, die wir schon oben im Plot verwendet haben, durcheinander zu teilen. Ausserdem `arrange`, womit wir die Tabelle nach einer Spalte, nämlich `ratio` sortieren können. Vielleicht auch `select`, um aus den vielen Spalten nur die vier auszuwählen, die uns interessieren. Zuletzt `head`, um nur die ersten 20 Zeilen zu sehen.
+
+Wie heissen die Gene, d.h., was ist "ENSG00000134571"? Wir können das für jedes Gen auf www.ensembl.org nachschlagen, oder wir verwenden die Tabelle (`gene_ids.tsv`, [hier](https://simon-anders.github.io/EDSB_Vorlesung/gene_ids.tsv)), die wir schon das letzte Mal benutzt haben:
+
+```{r}
+read_tsv( "~/w/Lecture/L3/gene_ids.tsv" ) %>%
+  select( "GeneID" = "gene_id", name, description ) -> geneNames
+    
+geneNames    
+```
+
+Beim Laden habe ich hier den Spaltennamen geändert ("GeneID" statt "gene_id"), damit er zur anderen Tabelle passt. Nun kann ich die beiden Tabellen mit `left_join` zusammen fügen:
+
+```{r}
+heartHigh %>%
+  left_join( geneNames )
+```
+
+### Aufgabe 3
+
+Ist ACTN2 (actin alpha 2, ENSG00000143632) wohl in allen Herz-Proben hoch und in allen anderen Proben niedrig?
+
+Um das und ähnliches heraus zu finden, wandeln wir unsere "breite" Tabelle mit allen Expressionswerten, die wir aus den Supplementary Data geladen haben, in eine "lange" Tabelle um. Dazu verwenden wir `gather`, wie in der Vorlesung:
+
+```{r}
+humanMatrix %>%
+  select( -Chr, -Begin, -End, -Strand, -ExonicLength ) %>%
+  gather( Sample, Expression, -GeneID ) -> humanLongTable
+
+humanLongTable 
+```
+
+(Bevor wir `gather` verwenden könnern, müssen wir aber erst die überflüssigen Spalten von "Chr" bis "ExonicLength" entfernen. Verwenden Sie `select` mit Minuszeichen vor den zu entfernenden Spaltennamen.)
+
+Nun können wir dies mit `filter` auf das Gen reduzieren, dass uns interessiert
+
+```{r}
+humanLongTable %>%
+  filter( GeneID == "ENSG00000143632" )
+```
+
+und plotten
+
+```{r}
+humanLongTable %>%
+filter( GeneID == "ENSG00000143632" ) %>%
+ggplot + 
+  geom_point( aes( y=Sample, x=Expression ) ) +
+  scale_x_log10()
+```
+
+Ich habe den Plot horizontal angeordnet, damit man die Proben-Namen besser lesen kann.
+
+Um es wirklich schön zu machen, können wir noch das Tidyverse-Verb `separate` verwenden, dass die Sample-Spalte auftrennt in drei Spalten für die drei Teile des Proben-Namens.
+
+```{r}
+humanLongTable %>%
+filter( GeneID == "ENSG00000143632" ) %>%
+separate( Sample, c( "Species", "Organ", "Subject" ) )
+```
+
+Können Sie austüfteln, wie man `separate` benutzt, um diese Tabelle zu erhalten, obwohl es in der Vorlesung noch nicht vorkam? Google hilft sicher.
+
+Schön wäre es auch, eine Spalte "Sex" zu haben, die "Male" oder "Female" enthält, ohne die bei Subject anhägnenden Zahlen.
+
+```{r}
+humanLongTable %>%
+filter( GeneID == "ENSG00000143632" ) %>%
+separate( Sample, c( "Species", "Organ", "Subject" ) ) %>%
+mutate( Sex = str_remove( Subject, "\\d" ) )
+```
+
+Wer ganz genau aufgepasst hat, erinnert sich, dass wir ein ganz ähnliches Problem in der Vorlesung hatten, aber darüber schnell hinweg gegangen sind, und kann den Code von damals anpassen. Den anderen sei es verraten: `mutate( Sex = str_remove( Subject, "\\d" ) )` entfernt eine Ziffer (`\\d`) von den Einträgen in der Spalte "Subject" und speichert das in der neuen Spalte "Sex".
+
+Damit können wir nun unseren Plot verschönern
+
+```{r}
+humanLongTable %>%
+filter( GeneID == "ENSG00000143632" ) %>%
+separate( Sample, c( "Species", "Organ", "Subject" ) ) %>%
+mutate( Sex = str_remove( Subject, "\\d" ) ) %>%
+ggplot +
+  geom_point( aes( x = Organ, y = Expression, col = Sex ), position = position_dodge( width=.1 ) ) +
+  scale_y_log10() + ggtitle( "Actinin alpha 2" )
+```
+
+Zum Abschluss ein sehr fortgeschrittener Plot: Hier sehen wir Plots für alle 20 Gene, die wir oben gefunden haben. Wenn Sie diesen Plot so hinbekommen sollten, sind Sie ganz klar längst ein Meister in R. Aber auch der vorstehende Plot ist sicher ganz und gar nicht einfach gewesen.
+
+```{r fig.width=12, fig.height=8}
+humanLongTable %>%
+semi_join( heartHigh ) %>%
+separate( Sample, c( "Species", "Organ", "Subject" ) ) %>%
+mutate( Sex = str_remove( Subject, "\\d" ) ) %>%
+left_join( geneNames ) %>%
+ggplot +
+  geom_point( aes( x = Organ, y = Expression, col = Sex ), position = position_dodge( width=.3 ) ) +
+  scale_y_log10() + facet_wrap( ~ name ) + theme(axis.text.x = element_text(angle = 90)) 
+``` 
+
+Überlegen Sie sich in diese Plot, wie Sie diese Gene charakterisieren können: Welche sind exklusiv für das Herz, welche sind für mehrere Organe wichtig? Passt das zu dem, was Sie im Web oder auf Wikipedia zu diesen Genen finden? 
+Beurteilen Sie auch, wie gut die Replikate jeweils übereinstimmen.
+
+
+### Aufgabe 4
+
+[fehlt noch]
+
+
