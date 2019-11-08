@@ -12,7 +12,7 @@ Die folgenden Schritte vollziehen die Prozessierung während der Vorlesung nach.
 library(tidyverse)
 
 read_tsv( "http://duffel.rail.bio/recount/v2/SRP035988/counts_gene.tsv.gz" ) ->  countsWide
-read_tsv( "gene_ids.tsv" )-> genes
+read_tsv( "https://raw.githubusercontent.com/simon-anders/EDSB_Vorlesung/master/gene_ids.tsv" )-> genes
 colnames(genes) <- c("gene_id", "name", "description")
 
 read_tsv( "http://duffel.rail.bio/recount/SRP035988/SRP035988.tsv" ) %>%
@@ -63,7 +63,7 @@ Diese Gene zu finden ist nichts ungewöhnliches.
 
 # 2. Welche Gene sind bei Psoriasis extrem dysreguliert?
 
-> Sehen Sie sich nun die Gene an, die bei Psoriasis um ein Vielfaches stärker exprimiert sind als bei gesunder Haus. Sortieren Sie dazu nach dem Expressions-Verhältnis krankhaft / normal. Ignorieren Sie sehr schwach exprimierte Gene (mit mittlerer Expression unter 0.01 TPM), da beiden diesen das Verhältnis zu ungenau ist. Wenn Sie sich die Gene mit über 30-facher Überregulation (und mindestens 0.01 TPM Expression) ansehen, welche "Themen" finden Sie diesmal?  
+> Sehen Sie sich nun die Gene an, die bei Psoriasis um ein Vielfaches stärker exprimiert sind als bei gesunder Haut. Sortieren Sie dazu nach dem Expressions-Verhältnis krankhaft / normal. Ignorieren Sie sehr schwach exprimierte Gene (mit mittlerer Expression unter 0.01 TPM), da beiden diesen das Verhältnis zu ungenau ist. Wenn Sie sich die Gene mit über 30-facher Überregulation (und mindestens 0.01 TPM Expression) ansehen, welche "Themen" finden Sie diesmal?  
 
 ```{r echo=TRUE}
 resultTable %>% 
@@ -114,7 +114,7 @@ Nun gehen wir erst einmal wie zu Beginn und in der Vorlesung vor, um die mittler
 
 ```{r echo=TRUE}
 tpmTableRand %>%
-  left_join( sampleTable ) %>%
+  #left_join( sampleTable ) %>%
   group_by( gene_id, condition ) %>%
   summarize( mean_tpm = mean( tpm ) ) %>% 
   spread( condition, mean_tpm ) %>%
@@ -154,10 +154,10 @@ Wie in der Aufgabe gefordert, und zur besseren Veranschaulichung, plotten wir nu
 
 ```{r echo=TRUE}
 compFC %>% 
-  filter(normal >= .1 & psoriatic >= .1) %>%  # gene die über .1 TPM in beiden Conditions detektiert wurden
+  filter(normal >= .01 & psoriatic >= .01) %>%  # gene die über .1 TPM in beiden Conditions detektiert wurden
   ggplot +  # generiere neuen ggplot plot
   aes( x = fold_change, y = fold_change_rand) +  # x und y Koordinaten Definition
-  geom_point(size=.01) +  # Plotte die Werte als Points mit einer festen Größe von 1% der Standardgröße
+  geom_point(size=.01, alpha = .25) +  # Plotte die Werte als Points mit einer festen Größe von 1% der Standardgröße
   scale_x_log10() +       # x- und y- Achse sollen log10 skaliert werden
   scale_y_log10() +       # s.o.
   coord_fixed() +         # Beide Achsen sollen die gleiche Skalierung aufweisen
