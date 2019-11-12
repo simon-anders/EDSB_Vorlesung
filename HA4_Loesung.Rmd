@@ -8,20 +8,20 @@ output:
 
 ## Lösung zur Hausaufgabe der 4. Woche
 
-(Hier noch ohne Code.)
+
 
 ### Aufgabe 1
 
 ```{r echo=FALSE} 
 library(knitr)
-opts_chunk$set( echo=FALSE, warning=FALSE, message=FALSE )
+opts_chunk$set( echo=TRUE, warning=FALSE, message=FALSE )
 ```
 
 Wir laden die Expressionsdatei aus dem "Supplementary Data 2" des Papers von Brawand et al.
 
 ```{r}
 library( tidyverse )
-read_tsv( "~/tmp/Human_Ensembl57_TopHat_UniqueReads.txt" ) -> humanMatrix
+read_tsv( "tmp/Supplementary_Data2/Human_Ensembl57_TopHat_UniqueReads.txt" ) -> humanMatrix
 
 humanMatrix
 ```
@@ -34,7 +34,9 @@ Für Aufgabe 2 können wir direkt zwei Spalten gegeneinander plotten:
 
 ```{r}
 ggplot( humanMatrix ) +
-  geom_point( aes( x=Human_Heart_Male1, y=Human_Kidney_Male1 ), size=.3, alpha=.3 ) +
+  geom_point( aes( x=Human_Heart_Male1, 
+                   y=Human_Kidney_Male1 ), 
+              size=.3, alpha=.3 ) +
   scale_x_log10() + scale_y_log10() + coord_fixed()
 ```
 
@@ -63,7 +65,7 @@ Welche Tidyverse-Verben brauchen wir hier? Zunächst `filter`, um die Bedingung 
 Wie heissen die Gene, d.h., was ist "ENSG00000134571"? Wir können das für jedes Gen auf www.ensembl.org nachschlagen, oder wir verwenden die Tabelle (`gene_ids.tsv`, [hier](https://simon-anders.github.io/EDSB_Vorlesung/gene_ids.tsv)), die wir schon das letzte Mal benutzt haben:
 
 ```{r}
-read_tsv( "~/w/Lecture/L3/gene_ids.tsv" ) %>%
+read_tsv( "https://simon-anders.github.io/EDSB_Vorlesung/gene_ids.tsv" ) %>%
   select( "GeneID" = "gene_id", name, description ) -> geneNames
     
 geneNames    
@@ -104,8 +106,9 @@ und plotten
 ```{r}
 humanLongTable %>%
 filter( GeneID == "ENSG00000143632" ) %>%
-ggplot + 
-  geom_point( aes( y=Sample, x=Expression ) ) +
+ggplot(aes( y=Sample, x=Expression )) + 
+  geom_point(  ) +
+  # geom_bar(stat="identity") +
   scale_x_log10()
 ```
 
@@ -116,7 +119,7 @@ Um es wirklich schön zu machen, können wir noch das Tidyverse-Verb `separate` 
 ```{r}
 humanLongTable %>%
 filter( GeneID == "ENSG00000143632" ) %>%
-separate( Sample, c( "Species", "Organ", "Subject" ) )
+separate( Sample, c( "Species", "Organ", "Subject" ), sep = "_", remove = F )
 ```
 
 Können Sie austüfteln, wie man `separate` benutzt, um diese Tabelle zu erhalten, obwohl es in der Vorlesung noch nicht vorkam? Google hilft sicher.
@@ -126,7 +129,7 @@ Schön wäre es auch, eine Spalte "Sex" zu haben, die "Male" oder "Female" enth�
 ```{r}
 humanLongTable %>%
 filter( GeneID == "ENSG00000143632" ) %>%
-separate( Sample, c( "Species", "Organ", "Subject" ) ) %>%
+separate( Sample, c( "Species", "Organ", "Subject" ), remove = F ) %>%
 mutate( Sex = str_remove( Subject, "\\d" ) )
 ```
 
@@ -144,6 +147,18 @@ ggplot +
   scale_y_log10() + ggtitle( "Actinin alpha 2" )
 ```
 
+```{r}
+humanLongTable %>%
+filter( GeneID == "ENSG00000143632" ) %>%
+separate( Sample, c( "Species", "Organ", "Subject" ), remove = F ) %>%
+mutate( Sex = str_remove( Subject, "\\d" ) ) %>%
+ggplot +
+  geom_point( aes( x = Sample, y = Expression, col = Organ, shape=Sex ), position = position_dodge( width=.1 ) ) +
+  scale_y_log10() + ggtitle( "Actinin alpha 2" ) +
+  theme(axis.text.x = element_text(angle=90, hjust=1, vjust=.5))
+```
+
+
 Zum Abschluss ein sehr fortgeschrittener Plot: Hier sehen wir Plots für alle 20 Gene, die wir oben gefunden haben. Wenn Sie diesen Plot so hinbekommen sollten, sind Sie ganz klar längst ein Meister in R. Aber auch der vorstehende Plot ist sicher ganz und gar nicht einfach gewesen.
 
 ```{r fig.width=12, fig.height=8}
@@ -154,7 +169,10 @@ mutate( Sex = str_remove( Subject, "\\d" ) ) %>%
 left_join( geneNames ) %>%
 ggplot +
   geom_point( aes( x = Organ, y = Expression, col = Sex ), position = position_dodge( width=.3 ) ) +
-  scale_y_log10() + facet_wrap( ~ name ) + theme(axis.text.x = element_text(angle = 90)) 
+  scale_y_log10() + 
+  facet_wrap( vars(name) ) +
+  # facet_grid(cols = vars(name), rows = vars(Sex))+
+  theme(axis.text.x = element_text(angle = 90)) 
 ``` 
 
 Überlegen Sie sich in diese Plot, wie Sie diese Gene charakterisieren können: Welche sind exklusiv für das Herz, welche sind für mehrere Organe wichtig? Passt das zu dem, was Sie im Web oder auf Wikipedia zu diesen Genen finden? 
@@ -163,6 +181,47 @@ Beurteilen Sie auch, wie gut die Replikate jeweils übereinstimmen.
 
 ### Aufgabe 4
 
-[fehlt noch]
+Als erstes klassifiziere ich alle Gene, ob sie sowohl in Herz und Niere, als auch bei der weiblichen und männlichen Gruppe stark exprimiert sind ( >= 1 ).
+Diese Tabelle nutze ich später, um die Gene entsprechend einzufärben.
+
+Um den gesamten Block verstehen zu können, empfehle ich, die einzelnen Schritte getrennt voneinander laufen zu lassen und sich die Zwischenergebnisse anzuschauen.
+```{r}
+humanLongTable %>%
+  separate( Sample, c( "Species", "Organ", "Subject" ) ) %>% 
+  filter(Organ %in% c("Heart", "Kidney")) %>% 
+  spread(Organ, value = Expression) %>% 
+  filter(Subject %in% c("Male1", "Female")) %>% 
+  mutate(is.low = ifelse(Heart <= 1 & Kidney <= 1, "low", "high")) %>% 
+  select(GeneID, Subject, is.low) %>% 
+  spread(Subject, is.low) %>% 
+  mutate(gene.class = ifelse(Female == "low" & Male1 == "low", "low", "high")) %>% 
+  select(GeneID, gene.class) -> hk.gene.class
+
+head(hk.gene.class)
+```
+
+Dann berechne ich für jedes Subject den Quotienten aus Heart und Kidney und vereine das Ergebnis mit der "Expressionsklasse" die ich in dem vorherigen Block errechnet habe.
+
+```{r}
+humanLongTable %>%
+  separate( Sample, c( "Species", "Organ", "Subject" ) ) %>% 
+  filter(Organ %in% c("Heart", "Kidney")) %>% 
+  spread(Organ, value = Expression) %>% 
+  mutate(Heart_to_Kidney = Heart / Kidney) %>% 
+  select(GeneID, Subject, Heart_to_Kidney) %>% 
+  spread(Subject, Heart_to_Kidney) %>% 
+  left_join(hk.gene.class) %>% 
+  arrange(gene.class) %>% 
+  ggplot(aes(x=Female, y = Male1, color = gene.class)) +
+  geom_point(size=.1, alpha=.5) +
+  scale_y_log10() +
+  scale_x_log10() +
+  geom_abline(slope=1)
+```
+
+
+
+
+
 
 
