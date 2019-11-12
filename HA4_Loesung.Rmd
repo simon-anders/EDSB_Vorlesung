@@ -181,8 +181,10 @@ Beurteilen Sie auch, wie gut die Replikate jeweils übereinstimmen.
 
 ### Aufgabe 4
 
-Als erstes klassifiziere ich alle Gene, ob sie sowohl in Herz und Niere, als auch bei der weiblichen und männlichen Gruppe stark exprimiert sind ( >= 1 ).
-Diese Tabelle nutze ich später, um die Gene entsprechend einzufärben.
+Als erstes klassifiziere ich alle Gene, ob sie in beiden Organen hoch (>=.1) exprimiert sind.
+Danach speichere ich, ob die Expression in beiden Geschlechtern, oder nur in jeweils einem hoch / tief ist.
+Die entstehende Tabelle nutze ich später, um die Gene im folgenden Plot einzufärben.
+Spiele ein wenig mit dem Cut-off (.1) herum, um dessen Effekt auf den Plot zu betrachten.
 
 Um den gesamten Block verstehen zu können, empfehle ich, die einzelnen Schritte getrennt voneinander laufen zu lassen und sich die Zwischenergebnisse anzuschauen.
 ```{r}
@@ -191,10 +193,12 @@ humanLongTable %>%
   filter(Organ %in% c("Heart", "Kidney")) %>% 
   spread(Organ, value = Expression) %>% 
   filter(Subject %in% c("Male1", "Female")) %>% 
-  mutate(is.low = ifelse(Heart <= 1 & Kidney <= 1, "low", "high")) %>% 
+  mutate(is.low = ifelse(Heart >= .1 & Kidney >= .1, "high", "low")) %>% 
+  mutate( Sex = str_remove( Subject, "\\d" ) ) %>%
+  mutate(is.low = paste0(Sex, "_", is.low)) %>% 
   select(GeneID, Subject, is.low) %>% 
   spread(Subject, is.low) %>% 
-  mutate(gene.class = ifelse(Female == "low" & Male1 == "low", "low", "high")) %>% 
+  mutate(gene.class = paste0(Female, "/", Male1)) %>% 
   select(GeneID, gene.class) -> hk.gene.class
 
 head(hk.gene.class)
@@ -219,7 +223,9 @@ humanLongTable %>%
   geom_abline(slope=1)
 ```
 
-
+Wie man sehen kann, gibt es Gene, die an dem Rand des Graphens angeordnet sind (lila).
+Mit der nun gewählten Farbgebung sieht man jedoch, dass diese Gene in beiden Geschlechtern nur ungenügend gut detektiert werden konnten.
+Gene die robust in beiden Geschlechtern detektiert werden konnten sind rot eingefärbt.
 
 
 
