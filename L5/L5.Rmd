@@ -1,0 +1,86 @@
+---
+title: "Data Science Lecture"
+author: "Simon Anders"
+date: "28 October 2019"
+output: html_document
+---
+
+## 5. Vorlesung (17.11.)
+
+### RNA-Seq: WIederholung
+
+Vor drei Wochen haben wir uns RNA-Seq-Daten zu Psoriasis beschäftigt.
+
+Zur Erinnerung:
+
+- Wir haben RNA von 92 Hautproben von entzündeter Haut von Patienten mit Psoriasis (Schuppenflechte) verglichen mit RNA von 82 Hautptoben von normaler Haut von gesunden Kontroll-Personen
+
+- Unsere Ausgangsdaten war eine Tabelle wie diese:
+
+```
+  SRR1146247 SRR1146248 SRR1146249 SRR1146250 SRR1146252 SRR1146253 SRR1146254 gene_id         
+       <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl> <chr>           
+1      72016      36886      29275      42934      37011      32276      56866 ENSG00000000003…
+2       4439       1944       4534       4574       3624       1026       3366 ENSG00000000005…
+3      68076      42009      43303      59295      55653      69326     100762 ENSG00000000419…
+4      51245      38352      40801      59140      36455      23744      51676 ENSG00000000457…
+5      20537      15268      14905      23552      21826      16121      26538 ENSG00000000460…
+```
+
+RNA-Seq count table:
+- Jede Zeile ist ein Gen (bezeichnet durch die Ensembl-Gen-ID)
+- Jede Spalte ist eine Probe (bezeichnet durch die Run-ID)
+- Die Zahlen geben an, wie viele der RNA-Seq-Reads jedes Probe auf jedes der Gene aliniert wurde
+- Die Original-Tabelle hatte 178 Proben (Spalten) und 58.037 Gene (Zeilen)
+
+Pivoting:
+- Um leichter arbeiten zu können, haben wir diese "breite" Tabelle in eine "lange Tabelle" umgewandelt, in der jede Zahl ihre eigene Zeile hat:
+
+```
+# A tibble: 10,330,586 x 3
+   gene_id          sample      count
+   <chr>            <chr>       <dbl>
+ 1 ENSG000000000034 SRR1146076  26160
+ 2 ENSG00000000005  SRR1146076  10965
+ 3 ENSG000000004192 SRR1146076  24011
+ 4 ENSG000000004573 SRR1146076  22893
+ 5 ENSG000000004606 SRR1146076   9436
+ 6 ENSG000000009382 SRR1146076   7422
+ 7 ENSG000000009715 SRR1146076 477885
+ 8 ENSG000000010363 SRR1146076  67564
+ 9 ENSG000000010840 SRR1146076  54799
+10 ENSG000000011674 SRR1146076  35061
+# … with 10,330,576 more rows
+```
+
+Normalisierung:
+
+- Wir haben jede Zahl durch die Spaltensumme (die Gesamt-Zahl an Reads für jedes Sample, "total") geteilt, dann mit $10^6$ multipliziert, um "counts per million" (CPM) zu erhalten.
+
+```
+   gene_id          sample      count      total    cpm
+   <chr>            <chr>       <dbl>      <dbl>  <dbl>
+ 1 ENSG000000000034 SRR1146076  26160 1709688143  15.3 
+ 2 ENSG00000000005  SRR1146076  10965 1709688143   6.41
+ 3 ENSG000000004192 SRR1146076  24011 1709688143  14.0 
+ 4 ENSG000000004573 SRR1146076  22893 1709688143  13.4 
+ 5 ENSG000000004606 SRR1146076   9436 1709688143   5.52
+ 6 ENSG000000009382 SRR1146076   7422 1709688143   4.34
+ 7 ENSG000000009715 SRR1146076 477885 1709688143 280.  
+ 8 ENSG000000010363 SRR1146076  67564 1709688143  39.5 
+ 9 ENSG000000010840 SRR1146076  54799 1709688143  32.1 
+10 ENSG000000011674 SRR1146076  35061 1709688143  20.5 
+# … with 10,330,576 more rows
+```
+
+Dann haben wir unsere Metadaten angefügt:
+
+- für jede Gen-ID: Namen des Gens und Bedeutung des Namens
+- für jede Sample-ID: das "Label", ob es sich um normale oder psoriatrische Haut handelt
+
+
+
+Vergleich:
+
+- Dann haben wir für jedes Gen den Mittelwert der CPM-Werte von allen Psoriasis-Proben und von allen Proben von gesudner Haut gebildet.
+
