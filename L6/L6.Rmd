@@ -1,0 +1,58 @@
+---
+title: "Data Science Lecture"
+author: "Simon Anders"
+date: "28 October 2019"
+output: html_document
+---
+
+## 6. Vorlesung (24.11.)
+
+Nochmal Psoriasis: Letztes Mal haben wir den Psoriasis-Datensatz mit DESeq2 analysiert. Hier noch mal im Schnell-Durchlauf:
+
+```{r messages=FALSE,warnigns=FALSE}
+library( DESeq2 )
+library( tidyverse )
+
+# Laden der Matrix mit den Read-Zahlen:
+read_tsv( "../counts_gene.tsv.gz" ) %>%
+mutate( gene_id = str_remove( gene_id, "\\.\\d+" ) ) %>%
+column_to_rownames( "gene_id" ) %>%
+as.matrix ->
+  countsMatrix
+
+# Laden der Sample-Tabelle:
+read_tsv( "../SRP035988.tsv" ) %>%
+select( sample = run, subject = title, condition = characteristics ) %>%
+mutate( condition = fct_recode( condition,
+  "normal" = "tissue type: normal skin",
+  "psoriatic" = "tissue type: lesional psoriatic skin" ) ) %>%
+mutate( condition = fct_relevel( condition, "normal" ) ) -> sampleTable
+
+# und die Gen-Names
+read_tsv( "../gene_ids.tsv" ) -> genes
+
+# Konstruktion eines DESeq-Datenobjekts
+DESeqDataSetFromMatrix( countsMatrix, sampleTable[1:178,], ~condition ) -> dds   
+
+# Durchführung des Tests auf differentielle Expression
+dds %>% DESeq -> dds
+
+save.image( "psoriasis_DESeq.rda" )
+```
+
+Ein erster Überblick über die Ergebnisse: der MA-Plot
+
+```{r}
+plotMA( dds )
+```
+
+Wir hatten sehr viele differentiell exprimierte Gene. Hier ist die Liste aller signifikant hoch-regulierter Gene
+
+```{r}
+results(dds) %>%
+  as_tibble( rownames="gene_id" ) %>%
+  left_join( genes ) %>%
+  filter( padj < .1 & -log2FoldChange > 0 ) %>%    # Remove "-"!
+  arrange( desc( -log2FoldChange ) )
+```
+
