@@ -1,0 +1,106 @@
+## Zentraler Grenzwertsatz
+
+
+**Wenn man viele unabhängige Zufallszahlen aufaddiert, ist die Verteilung der Summe glocken-förmig. Die Form ist immer dieselbe, egal, was man aufaddiert (wenn es nur genügend Zahlen sind, und sie unabhängig sind). Man kann die Form durch zwei Größen beschreiben: den Mittelwert und die Standardabweichung (Breite). Der Rest ist djurch die Formel der Normalverteilung gegeben.**
+
+## Demonstration des zentralen Grenzwertsatzes
+
+Ein Würfel
+
+```{r}
+sample( 6, 1 )
+```
+
+Jeder Wert ist gleich wahrscheinlich
+
+```{r}
+table( sample( 6, 10000, replace=TRUE ) )
+```
+
+
+Zwei Würfel, aufaddiert
+
+```{r}
+sum( sample( 6, 2 ) )
+```
+
+Werte in der Mitte werden wahrscheinlicher
+
+```{r}
+table( rowSums( matrix( sample( 6, 20000, replace=TRUE ), ncol=2 ) ) )
+```
+
+```{r}
+hist( rowSums( matrix( sample( 6, 20000, replace=TRUE ), ncol=2 ) ), col="gray", breaks=100)
+```
+
+Drei Würfel aufaddiert: Die Spitze wird abgerundet:
+
+```{r}
+hist( rowSums( matrix( sample( 6, 30000, replace=TRUE ), ncol=3 ) ), col="gray", breaks=100)
+```
+
+```{r}
+hist( rowSums( matrix( sample( 6, 40000, replace=TRUE ), ncol=4 ) ), col="gray", breaks=100)
+```
+
+Schaut schon etwas glockenförmig aus.
+
+Zehn Würfel:
+
+```{r}
+hist( rowSums( matrix( sample( 6, 100000, replace=TRUE ), ncol=10 ) ), col="gray", breaks=200)
+```
+
+
+
+
+## t-Test, demonstriert per Simulation
+
+Hypothese: Menschen, die bei Vollmond geboren wurden, sind als Erwachsene größer als Menschen, die bei Neumond geboren wurden.
+
+Simulierte Daten, für die die Hypothese falsch ist
+
+```{r}
+# Größe von 20 Vollmond-Menschen
+hA <- rnorm( 20, 178, 7 )
+
+# Größe von 20 Neumond-Menschen
+hB <- rnorm( 20, 178, 7 )
+```
+
+t-Test:
+
+```{r}
+t.test( hA, hB )
+```
+
+Simuliere, dass 1000 Forscher diese Untersuchung machen
+
+```{r}
+pvals <- replicate( 1000, {
+  hA <- rnorm( 20, 178, 7 )
+  hB <- rnorm( 20, 178, 7 )
+  t.test( hA, hB )$p.value
+} )
+```
+
+Ihre p-Werte sind uniform verteilt:
+
+```{r}
+hist( pvals )
+```
+
+Etwa 5% der Forscher glauben daher, ein signifikantes Ergebnis gefunden zu haben (falls sie p<=0.05 als Signifikanzgrenze verwenden).
+
+xkcd #882 illustriert das Problem: https://xkcd.com/882/
+
+
+## False discovery rate und Benjamini-Hochberg-Korrektur
+
+Oft testen wir in einem Experiment viele Hypothesen: bei einem RNA-Seq-Experiment testen wir zB jedes Gen. Dies für zum Problem des "multiple testing":
+
+Beispiel: Wir testen 10,000 Gene und erhalten für jedes einen p-Wert. Wir betrachten nun alle Gene mit $p\le 0.01$ als statistisch signifikant. Selbst wenn für alle Gene die Nullhypothese gälte, würden wir erwarten, dass 1% der Gene, also 100 Gene, einen p-Wert unter 1% erhalten. Wenn wir tatsächlich 500 signifikante Gene (mit $p\le 0.01$) erhalte, so müssen wir davon ausgehen, dass diese Liste 100 Falsch-Positive enthält. Die *false discovery rate* (FDR) beträgt alse 20%. Falls uns das zu viel ist, können wir einen kleineren Grenzwert für Signifikanz wählen.
+
+Benjamini-Hochberg-Adjustierung (BH adjustment for multiple testing): Benjamini und Hochberg, die das Konzept der FDR eingeführt haben, schlagen vor, für jeden einzelnen p-Wert mittels des eben beschriebenen Schemas zu bestimmen, wie groß die FDR wäre, wenn man diesen p-Wert als Signifikanz-Grenze wählte. Dieser FDR-Wert wird oft als der BH-adjustierte p-Wert bezeichnet. In R berechnet die Funtion `p.adjust` (mit `method="BH"`) für einen Vektor mit p-Werten die BH-adjustierten Werte. Um eine Liste mit einer gewünschten FDR zu erhalten, nimmt man all jene Gene, die einen adjustierten p-Wert unter der gewünschten FDR haben.
+
