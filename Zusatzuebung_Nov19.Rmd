@@ -1,0 +1,200 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(knitr)
+opts_chunk$set( echo=TRUE, warning=FALSE, message=FALSE )
+```
+
+
+
+```{r}
+a <- "a"
+b <- 2
+c <- TRUE
+d <- c(1,2,3)
+c <- c(3,3,3)
+
+b * d
+
+d - c
+```
+
+DataFrame
+tibble
+
+# Data reading and writing
+Wir speichern die in R entahltene tabelle `mtcars` als Datei, welche wir später wieder einlesen.
+
+```{r}
+library( tidyverse )
+
+rownames_to_column(mtcars, "car") -> cars
+mtcars %>% rownames_to_column("car") -> cars
+
+cars <- as_tibble(cars)
+head(cars)
+```
+
+Writing to a CSV file
+```{r}
+dir.create("tmp")
+# Tidyverse
+write_csv(cars, "tmp/mtcars.csv")
+
+# Base R
+write.csv(cars, "tmp/mtcars_DOTcsv.csv", row.names = F, quote = F)
+```
+
+
+```{r}
+cars2 <- read_csv("tmp/mtcars.csv")
+
+cars2
+```
+
+```{r}
+xlsx::write.xlsx(cars, "tmp/mtcars.xlsx")
+
+cars.xlsx <- xlsx::read.xlsx("tmp/mtcars.xlsx", sheetIndex = 1)
+```
+
+
+
+# Tidyverse & GGPlot2
+Als erstes laden wir die Daten herunter.
+Die Daten können einfach [hier](https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/DEMO_I.XPT) und [hier](https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BMX_I.XPT) heruntergeladen werden.
+Speichert die Daten in dem Ordner `tmp` und in dessen Unterordner `nhanes`.
+
+```{bash eval=FALSE, include=FALSE}
+wget https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/DEMO_I.XPT -O tmp/nhanes/DEMO_I.XPT
+wget https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BMX_I.XPT -O tmp/nhanes/BMX_I.XPT
+```
+
+
+```{r}
+haven::read_xpt( "tmp/nhanes/DEMO_I.XPT" ) -> demo
+haven::read_xpt( "tmp/nhanes/BMX_I.XPT" ) -> bmx
+
+inner_join( demo, bmx, by="SEQN" ) %>%
+select( 
+   subjectId = SEQN,
+   age = RIDAGEYR,
+   sex = RIAGENDR,
+   height = BMXHT,
+   weight = BMXWT,
+   ethnicity = RIDRETH3,
+   education = DMDEDUC2,
+   bornInUS = DMDBORN4 ) %>%
+mutate(
+  sex = fct_recode( factor(sex), "male"="1", "female"="2" ),
+  ethnicity = fct_recode( factor(ethnicity), 
+    "mexican"="1", "hispanic"="2", "white"="3", "black"="4", "asian"="6", "other"="7" ),
+  education = fct_recode( factor(education),
+    "below9"="1", "9to11"="2", "high_school"="3", "some_college"="4",
+       "college"="5", "dontknow"="9" ),
+  bornInUS = fct_recode( factor(bornInUS),
+    "yes"="1", "no"="2", "dontknow"="99" )
+) ->  nhanes
+
+head(nhanes)
+```
+
+Inwiefern unterscheidet sich die Grüße von Männern und Frauen im alter >= 20 Jahren?
+```{r}
+nhanes %>% 
+  filter(age >= 20) %>% 
+  filter(!is.na(height)) %>% 
+  group_by(sex) %>% 
+  summarise(meanHeight = mean(height),
+            sdHeight = sd(height))
+```
+
+Das Gleiche in base-R:
+```{r}
+tmp <- nhanes[nhanes$age >=20 & !is.na(nhanes$height), ]
+
+data.frame(
+  meanHeight = tapply(1:nrow(tmp), tmp$sex, function(i){
+                  mean(tmp[i,]$height)
+                }),
+  sdHeight = tapply(1:nrow(tmp), tmp$sex, function(i){
+                sd(tmp[i,]$height)
+              })
+)
+
+```
+
+```{r}
+nhanes %>% 
+  ggplot(aes(x = age, 
+             y = height, 
+             color = sex)) +
+  geom_point(size=.1)
+```
+
+```{r}
+plot(
+  x = nhanes$age,
+  y = nhanes$height,
+  col = as.factor(nhanes$sex),
+  pch=".",
+  xlab = "age",
+  ylab = "height"
+)
+legend("bottomright",legend = unique(nhanes$sex), col=c("black", "red"), pch=".", title="sex")
+```
+
+
+```{r}
+nhanes %>% 
+  ggplot(
+    aes(
+      x = ethnicity,
+      y = height
+    )
+  ) +
+  geom_boxplot() 
+
+nhanes %>% 
+  ggplot(
+    aes(
+      x = ethnicity,
+      y = height,
+      fill = ethnicity
+    )
+  ) +
+  geom_boxplot(outlier.size = .1) +
+  geom_jitter(size=.1)
+
+nhanes %>% 
+  ggplot(
+    aes(
+      x = ethnicity,
+      y = height,
+      fill = ethnicity
+    )
+  ) +
+  geom_boxplot(outlier.size = .1) +
+  # geom_jitter(size=.1)
+  geom_point(size=.1, position = position_jitter(.25)) +
+  facet_wrap(vars(education))
+```
+
+```{r}
+nhanes %>% 
+  mutate(h_vs_w = height / weight) %>% 
+  ggplot(
+    aes(
+      x = ethnicity,
+      y = h_vs_w,
+      fill = ethnicity
+    )
+  ) +
+  geom_boxplot(outlier.size = .1) +
+  # geom_jitter(size=.1)
+  geom_point(size=.1, position = position_jitter(.25))
+```
+

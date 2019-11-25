@@ -1,0 +1,47 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+
+dat <- read_tsv("https://simon-anders.github.io/EDSB_Vorlesung/results_L3.tsv")
+
+if.a <- read_csv("tmp/IF_alpha.txt", col_names = "name")
+if.g <- read_csv("tmp/IF_gamma.txt", col_names = "name")
+
+dat %>% mutate(IF = ifelse(name %in% if.a$name, "IF_a", NA)) %>% 
+  mutate(IF = ifelse(name %in% if.g$name, "IF_g", IF)) -> dat
+
+dat
+```
+
+```{r}
+ggplot(dat, aes(x = normal, y = ratio, color = IF)) +
+  geom_point(size = .1) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_color_discrete()
+```
+
+```{r}
+dat %>% group_by(IF) %>% 
+  summarise(medianRatio = median(ratio))
+```
+
+```{r}
+rage <- read_tsv("tmp/RAGE_binding.txt", col_names = "name")
+dat %>% mutate(RAGE = name %in% rage$name) -> dat
+
+ggplot(dat, aes(x = normal, y = ratio, color = RAGE)) +
+  geom_point(size = .1) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_color_discrete()
+
+dat %>% filter(!is.na(ratio)) %>% 
+  group_by(RAGE) %>% 
+  summarise(medianRatio = median(ratio))
+```
+
