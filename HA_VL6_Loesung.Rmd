@@ -1,0 +1,256 @@
+---
+title: "Hausaufgabe 6. Vorlesung"
+output: html_notebook
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = T)
+```
+
+
+```{r}
+library( tidyverse )
+tibble(
+   group = c("ctrl", "ctrl", "ctrl", "ctrl", "ctrl", "ctrl", "ctrl", 
+      "drug", "drug", "drug", "drug", "drug", "drug", "drug"), 
+   volume = c(643.4, 393.2, 414.3, 464.5, 590.1, 629.3, 420.8, 
+     290.4, 246.4, 209.1, 257.6, 309.7, 357.2, 253.5 ) ) -> mouse_data
+```
+
+> a) Plotten Sie die Daten. 
+
+```{r}
+# Lösung der Aufgabe:
+mouse_data %>%
+  ggplot(aes(x = group, y = volume)) +
+  geom_point()
+```
+
+Es kam die Frage auf, wie man die Standardabweichung hinzuplottet.
+Der folgende Code kombiniert den obigen Plot mit Errorbars und dem Mittelwert als roten Kreis.
+
+Der Teil in `geom_errorbar` nutzt die `mouse_data` Tabelle und errechnet den gruppenspezifischen Mittelwert und Standardabweichung.
+Da wir in `geom_errorbar` nun nicht mehr die Originalwerte von `mouse_data` nutzen, müssen wir den Parameter `data=` erneut setzen.
+```{r}
+# Plus Errorbars
+mouse_data %>% 
+  ggplot() +
+  geom_point(aes(x = group, y = volume)) +  ## geom_point(shape=1)
+  stat_summary(aes(x = group, y = volume),
+               geom = "point", fun.y = mean, color = "red", shape=1) +  # Fügt den Mean der Gruppe als roten Kreis hinzu
+  geom_errorbar(data = mouse_data %>%  
+                 group_by(group) %>% 
+                 summarise(mean = mean(volume),
+                           sd = sd(volume)),
+                aes(ymin = mean-sd, ymax = mean+sd, x = group), width=.15) 
+```
+
+T-Test:
+
+```{r}
+t.test(
+  x = mouse_data %>% filter(group == "drug") %>% pull(volume),
+  y = mouse_data %>% filter(group == "ctrl") %>% pull(volume),
+  alternative = "less"
+)
+```
+
+
+> Aufgabe 2: 
+
+>Die Daten der Tabelle in der vorigen Aufgabe sind nicht echt (orientieren sich aber an einem echten Experiment). 
+
+>Ich habe sie mit dem folgenden Code erzeugt:
+
+```{r}
+tibble( 
+  group = rep( c( "ctrl", "drug" ), each=7 ) ) %>%
+mutate(
+  volume = exp( rnorm( n(),
+    mean = case_when(
+      group=="ctrl" ~ log(500),
+      group=="drug" ~ log(300) ),
+    sd = 0.7 ) ) )
+```
+
+>Wie Sie sehen, werden hier log-normal-verteilte Zufallszahlen erzeugt, so dass der Erwartungswert der Volumen für Tumoren von "control"-Mäusen etwa bei 500 mm³ liegt und für behandelte Mäusen etwa 300 mm³. Der erwartete Effekt ist als, dass das Medikament das Tumourvolumen um 40% reduziert (von 500 mm³ auf 300 mm³). Die Standardabweichung innerhalb der beiden Gruppen beträgt auf der logarithmischen Skala 0.7.
+
+> a) Würfeln Sie ein paar mal neue Daten aus, indem Sie diesen Code ausführen, und führen Sie jedes Mal den t-Test nochmals durch. Wie oft erhalten Sie einen signifikanten p-Wert?
+
+Hier habe ich direkt den Code angegeben, um 1000-mal neue Daten auszuwürfeln.
+```{r}
+p.vals <- replicate(1000, {
+  tibble( 
+  group = rep( c( "ctrl", "drug" ), each=7 ) ) %>%
+  mutate(
+    volume = exp( rnorm( n(),
+      mean = case_when(
+        group=="ctrl" ~ log(500),
+        group=="drug" ~ log(300) ),
+      sd = 0.7 ) ) ) -> tmp
+  
+  t.test(
+    x = tmp %>% filter(group == "drug") %>% pull(volume),
+    y = tmp %>% filter(group == "ctrl") %>% pull(volume),
+    alternative = "less"
+  )$p.value  ## extrahiert den P-value von dem Testergebnis
+})
+
+hist(p.vals, breaks = 20)
+sum(p.vals <= .05)  # Die Summe eines logischen Vectors entspricht der Anzahl an Elemente, die die Kondition erfüllen
+```
+
+
+> b) Wie ändert sich das, wenn Sie deutlich weniger Mäuse, oder deutlich mehr Mäuse pro Gruppe verwenden? 
+
+Simulation mit 2 Mäusen:
+```{r}
+p.vals <- replicate(1000, {
+  tibble( 
+  group = rep( c( "ctrl", "drug" ), each=2 ) ) %>%
+  mutate(
+    volume = exp( rnorm( n(),
+      mean = case_when(
+        group=="ctrl" ~ log(500),
+        group=="drug" ~ log(300) ),
+      sd = 0.7 ) ) ) -> tmp
+  
+  t.test(
+    x = tmp %>% filter(group == "drug") %>% pull(volume),
+    y = tmp %>% filter(group == "ctrl") %>% pull(volume),
+    alternative = "less"
+  )$p.value
+})
+
+hist(p.vals, breaks = 20)
+```
+
+Mit 500 Mäusen je Condition:
+```{r}
+p.vals <- replicate(1000, {
+  tibble( 
+  group = rep( c( "ctrl", "drug" ), each=500 ) ) %>%
+  mutate(
+    volume = exp( rnorm( n(),
+      mean = case_when(
+        group=="ctrl" ~ log(500),
+        group=="drug" ~ log(300) ),
+      sd = 0.7 ) ) ) -> tmp
+  
+  t.test(
+    x = tmp %>% filter(group == "drug") %>% pull(volume),
+    y = tmp %>% filter(group == "ctrl") %>% pull(volume),
+    alternative = "less"
+  )$p.value
+})
+
+hist(p.vals, breaks = 20)
+```
+
+> c) Nehmen Sie nun an, Sie müssten einen solchen Versuch planen. Von früheren Studien wissen Sie bereits, dass 500 mm³ ein typischer Wert für das Tumorvolumen einer unbehandelten Maus ist, und dass eine Standardabweichung von 0.2 auf der logarithmischen Skala die Varianz in Tumorvolumen solcher Mäuse einigermaßen gut beschreibt. Sie wissen nicht, wie stark Ihr Medikament wirkt (sonst wäre der Versuch ja unnötig), hoffen aber, dass der Effekt mindestens eine 30%ige Reduktion des Tumorvolumens ist. Indem Sie mit dem obigen Code verschiedene Parameter ausprobieren, können Sie grob beurteilen, wie groß jeweils die Chance auf ein signifikantes Ergebnis ist.
+
+```{r}
+p.vals <- replicate(1000, {
+  tibble( 
+  group = rep( c( "ctrl", "drug" ), each=4 ) ) %>%
+  mutate(
+    volume = exp( rnorm( n(),
+      mean = case_when(
+        group=="ctrl" ~ log(500),
+        group=="drug" ~ log(500*.7) ),
+      sd = 0.2 ) ) ) -> tmp
+  
+  t.test(
+    x = tmp %>% filter(group == "drug") %>% pull(volume),
+    y = tmp %>% filter(group == "ctrl") %>% pull(volume),
+    alternative = "less"
+  )$p.value
+})
+
+
+sum(p.vals <= .05)
+```
+
+
+Die unten genutzten Daten wurden generiert, indem der obige Codeblock mit den jeweiligen Anzahlen an Mäusen laufen gelassen wurde.
+
+```{r}
+tibble(
+  nMice = c(2,5,6,7,10),
+  nS = c(211,791,891,910,987)
+) %>% 
+  ggplot(aes(x = nMice, y = nS)) +
+  geom_point() +
+  geom_line() +
+  xlab("n(Mice)") +
+  ylab("n(signif. p)")
+```
+
+
+> Wie viele Mäuse würden Sie für den Versuch verwenden? Denken Sie daran, dass Sie ethisch verpflichtet sind, nicht mehr Tiere als nötig zu verwenden. Denken Sie aber auch daran, dass ethisch ebenso falsch ist, zu wenige Mäuse zu verwenden, die dann für einen Versuch geopfert würden, der kaum Erfolgschancen hat.
+
+Aufgrund diesem Ergebnis, könnte man 7 Mäuse je Kondition nutzen, um mit eta 90% Wahrscheinlichkeit den angenommenen biologischen Effekt tatsächlich zals "signifikant" zu klassifizieren.
+
+# Zusatz 
+
+Im folgenden habe ich eine Funktion geschrieben, die die obige Simulation für eine beliebige Anzahl an Tieren durchführt und die Zahl an signifikanten p-Werten zurückgibt.
+Da das Ziehen aus den beiden Verteilungen statistisch erfolgt, simuliere ich jede Zahl drei Mal, um die Streuung abschätzen zu können.
+```{r}
+get.ex.signif <- function(n_animals){
+  
+  n.signif <- rep(NA, length(n_animals))
+  for(i in 1:length(n_animals)){
+    a <- n_animals[i]
+    p.vals <- replicate(1000, {
+    tmp <- tibble( 
+      group = rep( c( "ctrl", "drug" ), each=a ) ) %>%
+        mutate(
+          volume = exp( rnorm( n(),
+            mean = case_when(
+              group=="ctrl" ~ log(500),
+              group=="drug" ~ log(500*.7) ),
+            sd = 0.2 ) ) )
+      
+      t.test(tmp %>% filter(group == "drug") %>% pull(volume),
+             tmp %>% filter(group == "ctrl") %>% pull(volume),
+             alternative = "less")$p.value})
+    
+      n.signif[i] <- sum(p.vals <= .05)
+  }
+  
+  
+    
+    return(n.signif)
+}
+
+
+tibble(
+  n_animals = rep(c(2:10,15,20), each=3)
+) %>% 
+  mutate(n_signif = get.ex.signif(n_animals)) -> signif.tib
+```
+
+Und hier der Plot:
+```{r}
+signif.tib %>% 
+  ggplot(aes(x = n_animals, y = n_signif)) +
+  geom_point()
+```
+
+Auch dieser zeigt, dass etwa 7 Tiere eine gute Wahl sein könnten.
+
+
+Da diese Art an Analysen sehr häufig benötigt wird, gibt es auch R Packages, die sie durchführen können.
+Hier ein Beispiel aus dem `pwr` (sprich: Power) Package.
+```{r}
+mean.diff <- log(500*.7)-log(500)
+pooled.sd <- sqrt((.2^2+.2^2)/2)
+
+pwr::pwr.t.test(d=mean.diff/pooled.sd, 
+                sig.level = .05, 
+                power = .9, 
+                type = "two.sample", 
+                alternative = "less")
+```
+
+Auch dieses Modell empfiehlt 7 Tiere pro Gruppe, um mit 90%iger Wahrscheinlichkeit den angenommenen Effekt als signifikant wahrzunehmen.
