@@ -1,0 +1,45 @@
+
+## Fürs nächste Mal
+
+
+```{r}
+focusedMDS( 1 - tissueCorrMatrix, 
+  ids = rownames(tissueCorrMatrix) %>% str_replace_all( "\\W", "_" ) )
+```
+
+```{r}
+focusedMDS( dist(pca$x[,1:10]), 
+  ids = rownames(tissueCorrMatrix) %>% str_replace_all( "\\W", "_" ) )
+```
+
+
+```{r}
+plot( 
+  rowMeans(log1p(tissueMedians)),    
+  genefilter::rowSds(log1p(tissueMedians)),
+  pch="." )
+abline( h=1.5 )
+```
+
+```{r fig.height=13,fig.width=7}
+hvg <- names(which( genefilter::rowSds(log1p(tissueMedians)) > 1.5 ))
+
+pheatmap::pheatmap( log1p(tissueMedians[hvg,]) )
+```
+
+```{r fig.width=7,fig.height=14}
+pheatmap::pheatmap( t(apply( log1p(tissueMedians[hvg,]), 1, function(x) x - median(x) ) ),
+ color = colorRampPalette(c("red","white","blue"))(100), breaks=seq(-8,8,length.out=100) )
+```
+
+```{r fig.height=13,fig.width=7}
+pca <- prcomp( t( log1p( tissueMedians ) ) )
+
+pheatmap::pheatmap( t(pca$x), cluster_rows=FALSE )
+```
+```{r}
+pca <- prcomp( t( log1p( tissueMedians[,-(1:2)] ) ) )
+
+plotly::ggplotly( pca$x %>% as_tibble( rownames = "tissue" ) %>%
+  ggplot + geom_point(aes( x=PC1, y=PC2, label=tissue )) + coord_fixed() )
+```

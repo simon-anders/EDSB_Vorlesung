@@ -1,0 +1,500 @@
+## 7. Vorlesung: Distanz-Maße und Clustering
+
+### GTEx
+
+Das "Gene-Tissue expression"=Projekt (GTEx) ist eine große internationale Zusammenarbeit, um
+
+- Proben vieler verschiedener menschlicher Gewebe post mortem von verschiedenen Spendern zu sammeln
+- die Spender zu genotypisieren (durch Sequenzierung der gesamten oder der exonischen DNA)
+- die mRNA aller Gewebeproben zu sequenzieren
+
+um zu untersuchen
+
+- wie sich die Genexpression zwischen verschiedenen Geweben unterscheidet
+- wie sich die Genexpression zwischen verschiedenen Menschen unterscheidet
+- wie der Genotyp die Genexpression (ein Phänotyp) bestimmt
+
+Heute verwenden wir einige GTEx-Daten als Beispiele.
+
+```{r message=FALSE, warning=FALSE}
+library( tidyverse )
+```
+
+```{r include=FALSE}
+# This code selects a number of samples and writes their sample ID into a file
+
+read_tsv("~/Downloads/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt") %>% 
+select( SAMPID, SMTS, SMTSD ) -> a
+a %>% filter( SAMPID == "GTEX-1117F-0426-SM-5EGHI" ) -> outlier_sample
+a %>% filter( SMTS == "Blood Vessel" ) %>% 
+group_by( SMTSD ) %>%
+sample_n( 15 ) %>%
+bind_rows( outlier_sample ) %>%
+pull( SAMPID ) %>%
+writeLines( "sampleIds.txt" )
+```
+
+```{r include=FALSE}
+# The Python script 'subset_GTEx.py' uses the file just written to subset the large GTEx count matrix
+# We read it in here and fix a few issues.
+
+read_tsv( "~/w/repos/EDSB_Vorlesung/L7/GTEx_subset.gct.gz" ) %>%
+  select( -Name ) %>%
+  rename( gene = Description ) %>%
+  group_by( gene ) %>%
+  mutate( gene_deduplicated = if( n()==1 ) gene else str_c( gene, "_", 1:n() ) ) %>%
+  ungroup %>% select( -gene ) %>%
+  column_to_rownames( "gene_deduplicated" ) %>%
+  as.matrix -> countMatrix
+colnames(countMatrix) %>% str_sub( -5, -1 ) -> colnames(countMatrix)
+```
+
+```{r include=FALSE}
+# This here reads the same table once more and susets to the samples mentioned in the count table
+
+read_tsv("~/Downloads/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt")  %>% 
+  select( SAMPID, SMTS, SMTSD ) %>%
+  mutate( donor_id = str_extract( SAMPID, "(?<=GTEX-)\\w*" ) ) %>%
+  mutate( tissue_site_id = str_extract( SAMPID, "(?<=GTEX-\\w{5}-)\\w*" ) ) %>%
+  mutate( sample_id = str_extract( SAMPID, "(?<=SM-)\\w*" ) ) %>%  
+  right_join( countMatrix %>% colnames %>% enframe(NULL,"sample_id") ) -> sampleTable
+
+stopifnot( all( colnames(countMatrix) == sampleTable$sample_id ) )
+```
+
+```{r include=FALSE}
+# Last part: the tissue medians
+
+read_tsv( "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz", skip=2 ) %>% select( -Name ) %>%
+rename( gene = Description ) %>%
+group_by( gene ) %>%
+mutate( gene_deduplicated = if( n()==1 ) gene else str_c( gene, "_", 1:n() ) ) %>%
+ungroup %>% select( -gene ) %>%
+column_to_rownames( "gene_deduplicated" ) %>%
+as.matrix -> tissueMedians
+```
+
+```{r include=FALSE}
+# Save all this
+
+save( countMatrix, sampleTable, tissueMedians, file="L7_gtex_example_data.rds" )
+```
+
+Ich habe Beispieldaten vorbereitet, die wir hier laden:
+
+```{r}
+load( "L7_gtex_example_data.rds" )
+```
+
+(Diese "rds"-Datei enthält drei Variablen: `countMatrix`, `sampleTable` und `tissueMedians`. Die letzte brauchen wir erst später.)
+
+Hier die RNA-Seq-Counts von einigen der GTEx-Proben:
+
+```{r}
+countMatrix[ 1:10, 1:10 ]
+```
+
+Die Count-Matrix von GTEx enthält eigentlich 22.950 Sample. Diese große Matrix kann man auf der GTEx-Webseite (https://gtexportal.org/) als Datei `GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct.gz` herunterladen. Für unser Beispiel have ich daraus nur 44 ausgewählt. Daher hat unsere Matrix nur 44 Spalten. 
+
+```{r}
+dim(countMatrix)
+```
+
+und die zugehörige Proben-Tabelle (generiert aus der großen Tabelle `GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt`)
+
+```{r}
+sampleTable %>% head
+```
+
+```{r}
+sampleTable %>% group_by( SMTSD ) %>% count
+```
+
+Als erstes  vergleichen wir die RNA-Seq-Daten von drei Proben:
+
+- links: Proben von Herzkranzgefäße von zwei verschiedenen Spendern
+- rechts: die erste Herzkrankgefäß-Probe und eine Probe eines Skelettmuskels eines dritten Spenders
+
+Jeder Punkt ist ein Gen, seine Koordianten sind die Anzahl der Sequenzier-Reads, die in den beiden Probem dem Gen zugeordnet wurden
+
+```{r echo=FALSE,fig.width=10, fig.height=5.5}
+par( mfrow=c(1,2) )
+
+plot( 
+  asinh( countMatrix[,"7IGMY"] ), 
+  asinh( countMatrix[,"7IGP6"] ), 
+  cex=.1, asp=1, col=adjustcolor("black"), xaxt="n", yaxt="n",
+  xlab = "GTEx sample 7IGMY", ylab = "GTEx sample 7IGP6" )
+axis( 1, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ) ) 
+axis( 2, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ), las=1 ) 
+
+plot( 
+  asinh( countMatrix[,"7IGMY"] ), 
+  asinh( countMatrix[,"5EGHI"] ), 
+  cex=.1, asp=1, col=adjustcolor("black"), xaxt="n", yaxt="n",
+  xlab = "GTEx sample 7IGMY", ylab = "GTEx sample 5EGHI" )
+axis( 1, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ) ) 
+axis( 2, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ), las=1 ) 
+```
+
+Hier ist es schwer, zu sehen, wie viele Punkte direkt übereinander geplottet wurden ("overplotting"). Daher derselbe Plot nochmal, mit Transparenz (jeder Punkt deckt nur zu 20% ["20% opacity"])
+
+```{r echo=FALSE,fig.width=10, fig.height=5.5}
+par( mfrow=c(1,2) )
+
+plot( 
+  asinh( countMatrix[,"7IGMY"] ), 
+  asinh( countMatrix[,"7IGP6"] ), 
+  cex=.1, asp=1, col=adjustcolor("black",.2), xaxt="n", yaxt="n",
+  xlab = "GTEx sample 7IGMY", ylab = "GTEx sample 7IGP6" )
+axis( 1, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ) ) 
+axis( 2, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ), las=1 ) 
+
+plot( 
+  asinh( countMatrix[,"7IGMY"] ), 
+  asinh( countMatrix[,"5EGHI"] ), 
+  cex=.1, asp=1, col=adjustcolor("black",.2), xaxt="n", yaxt="n",
+  xlab = "GTEx sample 7IGMY", ylab = "GTEx sample 5EGHI" )
+axis( 1, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ) ) 
+axis( 2, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ), las=1 ) 
+```
+(Den Code zum Plotten habe ich hier ausgeblendet.)
+
+
+Wie können wir die Ähnlichkeit von Proben quantifizieren?
+
+Distanz- und Ähnlichkeitsmaße:
+
+- Pearsons Korrelationskoeffizient
+- Spearmans Korrelationskoeffzient
+- Euklidsche Distanz der Expressionsvektoren
+- Manhatten-Distanz der Expressionsvektoren
+- Standardabweichung der Differenzen (der "log fold changes")
+- usw.
+
+Wir besprechen zunächste die Pearson-Korrelation:
+
+Wir möchten diese drei Spalten ("Vektoren") vergleichen
+
+```{r}
+countMatrix[ , c( "7IGMY", "7IGP6", "5EGHI" ) ] %>% head( 20 )
+```
+
+### Pearson-Korrelation
+
+Die Korrelation der ersten mit der zweiten und mit der dritten Spalte:
+
+```{r}
+cor( countMatrix[,"7IGMY"], countMatrix[,"7IGP6"] )
+cor( countMatrix[,"7IGMY"], countMatrix[,"5EGHI"] )
+```
+
+Was wird hier berechnet?
+
+Formel zu Pearson-Korrelation zwischen zwei Vektoren $x_j$ und $y_j$:
+
+$$ r = \frac{\sum_{j=1}^n(x_j-\overline x)(y_j-\overline y)}{\sqrt{\sum_{j=1}^n(x_j-\overline x)}{\sqrt{\sum_{j=1}^n(y_j-\overline y)}}} \qquad \text{mit }\, \tilde x_j = x_j - \overline x\,\text{ und }\, \tilde y_j = y_j - \overline y$$
+
+Dasselbe in Einzelschritten:
+
+1. Zur Vorbereitung berechnen wir die Mittelwerte der Vektoren:
+
+$$ \overline x = \frac{1}{n}\sum_{j=1}^n x_j \qquad\text{und}\qquad \overline y = \frac{1}{n}\sum_{j=1}^n y_j$$
+
+2. Dann "zentrieren" wir die Daten, indem wir die Mittelwerte abziehen
+
+$$ \tilde x_j = x_j - \overline x,\qquad \text{und}\qquad \tilde y_j = y_j - \overline y.$$
+3. Die zentrierten Daten haben jetzt die Mittelwerte 0. Nun berechnen wir die Summe der Produkte der Wertepaare:
+
+$$ \text{Produktsumme} = \sum_{j=1}^n \tilde x_j \tilde y_j $$
+
+Beachte, wie die Summe davon abhängt, ob die Wertepaare, die wir multiplizieren, dasselbe Vorzeichen haben oder nicht.
+
+Wenn wir die Produktsumme durch $n$ teilen, erhalten wir den Mittelwert der Produkte, genannt die Kovarianz. 
+
+Eine hohe Kovarianz bedeutet dass ein Gen meistens in beiden Proben hoch oder in beiden Proben niedrig ist, so dass das Produkt oft positiv ist.
+
+Wann ist eine Kovarianz hoch?
+
+Wenn $x$ und $y$ gleich sind, sind sie perfekt korreliert. Dann ist die Produktsumme $\sum_j \tilde x_j^2=\sum_j \tilde y_j^2$. Es scheint Sinn zu machen, den geometrischen Mittelwert dieser beiden Werte als Vergleichs-Maßstab zu nehmen, um zu sehen, ob die Kovarianz hoch ist:
+
+WIr vergleichen $\sum_{j=1}^n \tilde x_j \tilde y_j$ mit $\sum_{j=1}^n \tilde x_j^2$ und $\sum_{j=1}^n \tilde y_j^2$, wie folgt:
+
+$$ \text{Pearsons Korrelationskoeffizient} =  \frac{ \sum_{j=1}^n \tilde x_j \tilde y_j }{\sqrt{ \left(\sum_{j=1}^n \tilde x_j^2\right) \left(\sum_{j=1}^n \tilde y_j^2\right) }} $$
+Dieser Wert ist stes zwischen  -1 und 1.
+
+Beachte aber: "Anscombe's Quartett" -- Diese vier Beispiele haben alle den gleichen Korrelationskoeffizienten:
+
+![](https://en.wikipedia.org/wiki/File:Anscombe%27s_quartet_3.svg)
+(Bild: Wikipedia)
+
+Zurück zu unseren Daten:
+
+```{r}
+cor( countMatrix[,"7IGMY"], countMatrix[,"7IGP6"] )
+```
+
+Wir berechnen das nun in Einzelschritten:
+
+Was sind die Mittelwerte $\overline x$ und $\overline y$?
+
+```{r}
+mean( countMatrix[,"7IGMY"] )
+mean( countMatrix[,"7IGP6"] )
+```
+
+Wir zeichnen die Mittelwerte ein:
+
+```{r echo=FALSE}
+plot( 
+  asinh( countMatrix[,"7IGMY"] ), 
+  asinh( countMatrix[,"7IGP6"] ), 
+  cex=.1, asp=1, col=adjustcolor("black",.1), xaxt="n", yaxt="n",
+  xlab = "GTEx sample 7IGMY", ylab = "GTEx sample 7IGP6" )
+axis( 1, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ) ) 
+axis( 2, asinh( c( 0, 10^(0:7)) ), c( 0, 10^(0:7) ), las=1 ) 
+
+abline(
+  v = asinh( mean( countMatrix[,"7IGMY"] ) ),
+  h = asinh( mean( countMatrix[,"7IGP6"] ) ) )
+```
+
+Nun zentrieren wir die Werte und berechnen die Produkte und Quadrate
+
+```{r}
+tibble(
+  gene = rownames(countMatrix),
+  x = countMatrix[,"7IGMY"],
+  y = countMatrix[,"7IGP6"] ) %>%
+mutate( 
+  x_centered = x - mean(x),
+  y_centered = y - mean(y) ) %>%
+mutate( 
+  product = x_centered * y_centered,
+  x_centered_squared = x_centered^2,
+  y_centered_squared = y_centered^2 )
+```
+
+Wir beenden die Rechnung, indem wir die Summen in der Formel bilden und die Division durchführen
+
+```{r}
+tibble(
+  gene = rownames(countMatrix),
+  x = countMatrix[,"7IGMY"],
+  y = countMatrix[,"7IGP6"] ) %>%
+mutate( 
+  x_centered = x - mean(x),
+  y_centered = y - mean(y) ) %>%
+mutate( 
+  product = x_centered * y_centered,
+  x_centered_squared = x_centered^2,
+  y_centered_squared = y_centered^2 ) %>%    # <- bis hier genauso wie oben
+summarise( 
+  corrcoef = sum(product) / 
+    sqrt( sum(x_centered_squared) * sum(y_centered_squared) )
+)  
+```
+
+Wir betrachten nochmmal die einzelnen Summanden, und sortieren nach dem Produkt:
+
+```{r}
+tibble(
+  gene = rownames(countMatrix),
+  x = countMatrix[,"7IGMY"],
+  y = countMatrix[,"7IGP6"] ) %>%
+mutate( 
+  x_centered = x - mean(x),
+  y_centered = y - mean(y) ) %>%
+mutate( 
+  product = x_centered * y_centered,
+  x_centered_squared = x_centered^2,
+  y_centered_squared = y_centered^2 ) %>%
+  arrange( desc(product) )
+```
+
+Was geschieht, wenn wir nur die Zeilen mit den 100 höchsten Werten verwenden?
+
+```{r}
+tibble(
+  gene = rownames(countMatrix),
+  x = countMatrix[,"7IGMY"],
+  y = countMatrix[,"7IGP6"] ) %>%
+mutate( 
+  x_centered = x - mean(x),
+  y_centered = y - mean(y) ) %>%
+mutate( 
+  product = x_centered * y_centered,
+  x_centered_squared = x_centered^2,
+  y_centered_squared = y_centered^2 ) %>%   # <-- bis hier wie zuvor
+arrange( desc(product) )  %>%               # <-- sortiere nach Produkt-Wert
+head( 100 ) %>%                             # <-- verwende nur die 100 ersten (höchsten) Werte
+summarise(                                  # <-- und weiter wie bisher
+  corrcoef = sum(product) / 
+    sqrt( sum(x_centered_squared) * sum(y_centered_squared) )
+)  
+```
+
+Wir erhalten fast genau deselben Wert wie zuvor! Der Wert wird also fast nur von den höchst-exprimierten Genen bestimmt. Der Großteil unserer Daten hat kaum Einfluß auf das Ergebnis. Das ist nicht gut.
+
+Das Problem hier ist "Heteroskedastizität": bei stark exprimierten Genen sind nicht nur die absoluten Werte groß, sondern auch die Differenzen zwischen den Proben. Dies erkennt man gut wie folgt:
+
+Wir berechnen Mittelwert und Standardabweichung für alle Gene in unserer Datenmatrix und plotten dies
+
+```{r}
+plot( 
+  x = rowMeans( countMatrix ),
+  y = genefilter::rowSds( countMatrix ),
+  pch = "." )
+```
+(Hier habe ich Base-R-Plotting statt ggplot verwendet.)
+
+Dasselbe nochmal, mit logarithmischen Achsen
+```{r}
+plot( 
+  x = rowMeans( countMatrix ),
+  y = genefilter::rowSds( countMatrix ),
+  pch = ".", log="xy" )
+```
+
+Die Standardabweichung variert über 6 Größenordnungen: Die Gene rechts oben haben fast eine Million so viel Einfluß auf den Korrelationskoeffizienten wie die Gene links unten
+
+Vielleich hilft es, den Logarithmus zu nehmen? Wir verwenden hier "log1p":
+
+$$ \mathtt{log1p}(x) = \ln( 1 + x ) $$
+
+```{r echo=FALSE}
+plot( x=0:100, y=log1p(0:100), type="l" )
+```
+
+Wir nehmen erst den Logarithmus, dann berechnen wir Mittelwert und Standardabweichung
+
+```{r}
+plot( 
+  x = rowMeans( log1p(countMatrix) ),
+  y = genefilter::rowSds( log1p(countMatrix) ),
+  pch = ".", log="y", col=adjustcolor("black",.3) )
+```
+Viel besser: Jetzt variiert die Standardabweichung nur noch über eine Größenordnung.
+
+So eine Transformation nennt man eine "varianz-stabilisierende Transformation". Sie hilft, sicherzustellen, dass alle Gene inigermaßen gleichermaßen Einfluß auf Ergebnisse haben.
+
+Wir berechnen nochmal die beiden Korrelationskoeffzienten von oben, nun aber nachdem wir die Daten log-transformiert haben:
+
+```{r}
+cor( log1p( countMatrix[,"7IGMY"] ), log1p( countMatrix[,"7IGP6"] ) )
+cor( log1p( countMatrix[,"7IGMY"] ), log1p( countMatrix[,"5EGHI"] ) )
+```
+
+Wir können auch die Korrelationskoeffizienten für alle Paare von allen Proben so berechnen:
+Wenn man der `cor`-Funktion eine Matrix gibt, berechnet sie den Korrelationskoeffizienten jeder Spalte gegen jede andere Spalte.
+
+```{r}
+cor( log1p( countMatrix ) ) -> corrMatrix
+
+corrMatrix[ 1:8, 1:8 ]
+```
+
+Anstatt die Zahlen anzusehen, ist es hilfreich, die Matrix als "Heatmap" zu visualisieren:
+
+```{r fig.height=10}
+image( corrMatrix, asp=1 )
+```
+
+Der folgende, etwas kompliziertere, Befehl kann das etwas schöner:
+
+```{r }
+sampleTable %>% column_to_rownames( "sample_id" ) %>%
+  as.data.frame %>% `[`( , "SMTSD", drop=FALSE ) -> a
+  
+pheatmap::pheatmap(
+  corrMatrix,
+  cluster_rows=FALSE, cluster_cols=FALSE,
+  annotation_row = a, fontsize=7 )
+```
+
+So eine Heatmap wird übersichtlicher, wenn man die Proben geeignet sortiert, z.B. so dass Proben vom selben Gewebe (Spalte "SMTSD" in der Proben-Tabelle) nebeneinander liegen:
+
+```{r}
+o <- order( sampleTable$SMTSD )
+
+pheatmap::pheatmap(
+  corrMatrix[o,o],
+  cluster_rows=FALSE, cluster_cols=FALSE,
+  annotation_row = a[o,,drop=FALSE], fontsize=7 )
+```
+
+Es hilft, mit verschiedenen Farbskalen zu experimentieren. Die Viridis-Skalen sind darauf optimiert, optisch gleichmäßige Farbverläufe zu erreichen:
+
+```{r}
+o <- order( sampleTable$SMTSD )
+
+pheatmap::pheatmap(
+  corrMatrix[o,o],
+  cluster_rows=FALSE, cluster_cols=FALSE,
+  annotation_row = a[o,,drop=FALSE], fontsize=7,
+  color = viridis::plasma(100) )
+```
+
+Anstatt die Proben-Annotation zu verwenden, um die Proben anzuordnen, kann man auch Proben nebeneinander setzten lassen, die stark korreliert sind. Die "hclust"-Funktion findet so eine Anordnung:
+
+```{r}
+cl = hclust( as.dist( 1-corrMatrix ) )
+
+pheatmap::pheatmap(
+  corrMatrix,
+  cluster_rows=cl, cluster_cols=cl,
+  annotation_row = a, fontsize=7,
+  color = viridis::plasma(100) )
+```
+
+Die Linien am Rand sind sogenannte "Dendrogramme" (oder: Cluster-Bäume)
+
+Wie wurden sie erstellt?
+
+## Hierarchisches Clustering
+(auch genannt: agglomoratives Clustering)
+
+Gegeben: Objekte (hier: Proben) und eine Distanzmatrix (hier: Korrelationskoeffizienten zwischen Proben)
+
+Initialisierung: Jedes Objekt bildet einen "Cluster"
+
+Wiederhole folgendes, bis alle Objekte in einem großen CLuster liegen:
+
+- Finde die zwei ähnlichsten Cluster und fasse Sie zu einem größeren Cluster zusammen.
+
+Das Dendrogramm beschreibt, wie die Objekte zu Clustern zusammengefasst wurden.
+
+Die Länge der "Äste" gibt den Abstand der vereinigten Cluster wieder:
+
+```{r}
+plot( hclust( as.dist( 1-corrMatrix ), method="complete" ), cex=.6 )
+```
+
+Wie bestimmt man die Ähnlichkeit zweier CLuster?
+
+- Wenn beide Cluster einzelne Objekte sind, schaut man in die Distanz-Matrix (hier: Distanz = 1 - Korrelation)
+- Wenn die CLuster jeweils mehrere Objekte enthalten, gibt es verschiedene Möglichkeiten. Man betrachtet die Abstände jedes Objekts im ersten CLuster zu jedem Objekt im zweiten Cluster uns nimmt
+  - den kleinsten Wert ("single linkage")
+  - den größten Wert ("complete linkage") -- hier verwendet
+  - den Mittelwert ("average linkage")
+oder man berechnet, wann immer man zwei Cluster vereinigt, einen neuen Expressions-Vektor, indem man für jedes Gen den Mittelwert der transformierten Werte berechnet. Auch hier gibt es mehrere Möglichkeiten.
+
+
+## Medians
+
+Dat GTex-Projekt bietet eine Matrix an mit den Median-Expressionswerten für jedes Gewebe. Hier ist die Matrix `GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz`, schon leicht vorbereitet:
+
+```{r}
+dim( tissueMedians )
+
+tissueMedians[1:5,1:5]
+```
+
+Auch hier können wir die Korrelation zwischen jedem Paar an Geweben errechen, und dies als Input zum hierarchischen CLustern verwenden:
+
+```{r fig.height=12,fig.width=12}
+cor( log1p( tissueMedians ) ) -> tissueCorrMatrix
+
+tcl <- hclust( as.dist( 1-tissueCorrMatrix ) )
+pheatmap::pheatmap( tissueCorrMatrix, cluster_rows=tcl, cluster_cols=tcl  )
+```
