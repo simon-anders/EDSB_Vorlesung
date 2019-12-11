@@ -1,0 +1,235 @@
+## Hausaufgaben zur 7. Vorlesung
+
+```{r include=FALSE}
+knitr::opts_chunk$set(rows.print=25)
+```
+
+```{r message=FALSE,warning=FALSE}
+library( tidyverse )
+```
+
+Für diese Hausaufgaben verwenden wir dieselben Beispiel-Daten wie in der Vorlesung. Laden Sie die Daten [hier](https://simon-anders.github.io/EDSB_Vorlesung/L7/L7_gtex_example_data.rds) herunter.
+
+Mit dem `load`-Befehl können wir so eine RDS (R Data Set) -Datei laden:
+
+```{r message=FALSE,warning=FALSE}
+load( "L7_gtex_example_data.rds" )
+```
+
+Die Datei enthält drei Variablen
+
+```{r}
+ls()
+```
+
+Wir sehen uns die Variable `tissueMedians` an:
+
+```{r}
+str( tissueMedians )
+```
+
+Wir sehen, dass es eine Datenmatrix ist mit 56200 Zeilen und 54 Spalten.
+
+Hier ist die linke obere Ecke der Matrix
+
+```{r}
+tissueMedians[ 1:5, 1:5 ]
+```
+
+**Aufgabe:** Dies ist, leicht abgeändert, die Datei `GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct.gz` von https://gtexportal.org/home/datasets. Lesen Sie dort nach, was *genau* die Werte in der Matrix bedeuten. Was ist die Einheit? Wie wurden sie erstellt?
+
+Das "pheatmap"-Paket enthält die Funktion `pheatmap`, mit der wir uns die ersten 50 Zeilen der Matrix als Heatmap anzeigen lassen können. (Falls das `pheatmap`-Paket auf ihrem Computer nicht installiert ist, verwenden Sie den Befehl `install.packages( "pheatmap" )` um es herunter zu laden und automatisch zu installieren.)
+
+```{r fig.height=13,fig.width=8}
+library( pheatmap )
+pheatmap( log2( 1 + tissueMedians[1:50,] ) )
+```
+
+**Aufgabe**: Wieso habe ich im Aufruf der Heatmap-Funktion oben den Logarithmus (`log2`) genommen? Was geschieht, wenn man die Matrix direkt als Heatmap plottet, ohne sie zu logarithmieren? Warum das "1+"? Was geschieht, wenn man dies weg lässt?
+
+Die 50 ersten Gene waren nicht sehr interessant, da sie sich zwischen den Geweben kaum unterscheiden. Wir sollten lieber 50 Gene finden, die sich stark von Gewebe zu Gewebe unterscheiden. Dazu könnten wir für jedes Gen die *Varianz* über alle Gewebe berechnen. Hier ist eine Möglichkeit, dies zu tun:
+
+```{r}
+apply( log2( 1+tissueMedians ), 1, var ) %>% head
+```
+
+Den `apply`-Befehl haben wir aber bisher nie besprochen. Zur Übung verwenden wir daher, für denselben Zweck, die Tidyverse-Funktionen, die wir kennen (auch wenn das deutlich umständlicher ist).
+
+**Aufgabe**: Finden Sie dennoch (vielleicht durch googlen) heraus, was die `apply`-Funktion amcht. Was bedeutet die "1" vor "var"?
+
+Um Tidyverse zu verwenden, wandeln wir die Matrix zunächst in eine Tidyverse-Tabelle ("tibble") um, wie folgt:
+
+```{r}
+tissueMedians %>% as_tibble( rownames = "gene" )
+```
+
+Die ist eine "breite" Tabelle, wir wollen aber eine "lange" Tabelle, wie im folgenden:
+
+```{r echo=FALSE}
+tissueMedians %>% 
+as_tibble( rownames = "gene" ) %>%
+gather( tissue, tpm, -gene ) -> longTable
+
+longTable
+```
+
+**Aufgabe:** Mit welchem Tidyverse-Verb kommen Sie von der breiten zur langen Tabelle? Probieren Sie das in Ihrer eigenen R-Sitzung aus.
+
+Nun möchten wir für jedes Gen Mittelwert und Varianz bestimmen, d.h., wir suchen die folgende Tabelle:
+
+```{r echo=FALSE}
+longTable %>%
+group_by( gene ) %>%
+summarise(
+  mean = mean( log2( 1 + tpm ) ),
+  var = var( log2( 1 + tpm ) ) ) %>%
+arrange( desc(var) )
+```
+
+**Aufgabe:** Gemeinerweise habe ich schon wieder den R-Code ausgeblendet, mit dem ich diese Tabelle erzeugt habe. Können Sie den Code selbst rekonstruieren? Die Tabelle sollte nach Varianz absteigend sortiert sein.
+
+**Aufgabe:** Erzeugen Sie auch den zugehörigen Plot:
+
+```{r}
+longTable %>%
+group_by( gene ) %>%
+summarise(
+  mean = mean( log2( 1 + tpm ) ),
+  var = var( log2( 1 + tpm ) ) ) %>%
+ggplot + geom_point( aes( x = mean, y = var ), size=.3, alpha=.4 )
+```
+
+**Aufgabe:** Nun möchte ich die Namen der 80 Gene mit der höchsten Varianz finden, d.h. aus der Tabelle die ersten 80 Zeilen, und nur die Spalte "gene" herausziehen. Wie geht das?
+
+```{r echo=FALSE}
+longTable %>%
+group_by( gene ) %>%
+summarise(
+  mean = mean( log2( 1 + tpm ) ),
+  var = var( log2( 1 + tpm ) ) ) %>%
+arrange( desc(var) ) %>%
+head( 80 ) %>%
+pull( gene ) -> highly_variable_genes
+```
+
+**Ersatzlösung** Falls Ihnen die letzten beiden Schritte nicht gelungen sind, kopieren Sie einfach den folgenden Code, um die Liste hoch-variabler Gene in Ihre R-Sitzung zu bekommen:
+
+```{r echo=FALSE}
+dump( "highly_variable_genes", file="" )
+```
+
+Nun können wir die Heatmap plotten:
+
+```{r fig.height=13, fig.width=8}
+pheatmap( log2( 1 + tissueMedians[highly_variable_genes,] ) )
+```
+
+Oft ist es hilfreich, nicht den absoluten Wert der Expression eines Gens für jedes Gewebe zu sehen, sondern, ob das Gen in dem Gewebe stärker oder schwächer als in den anderen Geweben exprimiert wird. Dazu hilft es, für jedes Gen, den Median (oder den Mittelwert) über alle Gewebe zu bestimmen und ihn abzuziehen. 
+
+```{r include=FALSE}
+longTable %>%
+filter( gene %in% highly_variable_genes ) %>%
+mutate( expr = log2( 1 + tpm ) ) %>%
+group_by( gene ) %>%
+mutate( diff = expr - median(expr) ) %>%
+select( gene, tissue, diff ) %>%
+spread( tissue, diff ) %>%
+column_to_rownames( "gene" ) %>%
+as.matrix -> diffMatrix
+```
+
+```{r}
+diffMatrix[1:5,1:5]
+```
+
+Hier eine Heatmap dieser Matrix. 
+
+```{r, fig.height=13,fig.width=7}
+pheatmap( diffMatrix, 
+  fontsize=7,
+  breaks=seq(-10,10,length.out=100), 
+  color=colorRampPalette(c("blue","white","red"))(100) )
+```
+
+**Aufgabe**: Versuchen Sie, die Matrix `diffMatrix` selbst zu erstellen. Es gibt zwei Möglichkeiten: Entweder, Sie benutzen die `apply`-Funktion, um für jede Zeile den Median zu finden und abzuziehen. Oder, Sie verwenden Tidyverse.
+
+Der zweite Weg ist etwas umständlich, aber eine gute Übung. Hier eine "Roadmap". Jeder Bulletpoint ist ein Tidyverse-Verb
+
+- Beginnen Sie mit der "langen" Tabelle von oben.
+- Filtern Sie die Tabelle um nur die Gene aus `highly_variable_genes` zu behalten
+- Ersetzen Sie die `tpm`-Werte durch `log2( 1 + tpm )`
+- Gruppieren Sie die Zeilen nach Genen
+- Für jedes Gen ziehen Sie von den logarithmierten Expressionswerten deren Median ab
+- Nun entfernen Sie alle Spalten, die wir nicht mehr brauchen und
+- wandeln die "lange" Tabelle wieder in eine "breite" Tabelle um
+- Nun müssen wir zuletzt die breite Tidyverse-Tabelle wieder in eine Matrix umwandeln, da `pheatmap` mit Tidyverse-Tabellen nicht zurechtkommt. Dazu verwenden Sie: `breite_tabelle %>% column_to_rownames( "gene" ) %>% as.matrix`
+
+Nun können wir die Heatmap etwas ansehen.
+
+**Aufgabe**: Oft sind ähnliche Gewebe nun nebeneinander angeordnet, zum Beispiel Nieren-Cortex neben Nieren-Medulla. Warum aber findet sich die Hypophyse neben Gesamtblut? Inwiefern ähneln sich diese Gewebe?
+
+**Aufgabe**: Welche Gene sind typisch für die Leber und da stärker als überall sonst? Sehen Sie im [Human Protein Atlas](https://www.proteinatlas.org/), wo die von diesen Genen exprimierten Proteine gefunden wurden. Passt das zusammen? Schlagen Sie auch nach, was über die Funktion dieser Gene bekannt ist.
+
+**Aufgabe** All die "IGK..."-Gene sind stark miteinander korreliert. Warum? Was unterscheidet die Gewebe, in denen sie rot erscheinen, von denen, in denen sie blau sind? 
+
+**Aufgabe** Gibt es noch mehr Gene, die in der Leber viel stärker als in den anderen Geweben exprimiert sind? Finden Sie alle Gene, für die die Expression in der Leber mindestens viermal so hoch ist wie in allen anderen Geweben.
+
+Es gibt verscheidene Möglichkeiten, diese (nicht ganz einfache) Aufgabe zu lösen. Eine wäre, zunächst eine Tabelle mit nur den Leber-Expressionswerten zu erstellen
+
+```{r echo=FALSE}
+longTable %>%
+mutate( liver_expr = log2( 1 + tpm ) ) %>%
+filter( tissue == "Liver" ) %>%
+select( -tissue, -tpm ) -> liverOnlyTable
+
+liverOnlyTable
+```
+
+Dann eine Tabelle mit allen Werten, ausser denen der Leber. Dann können wir mit `group_by`, `summerize` und `max` die Maxiuma finden
+
+```{r echo=FALSE}
+longTable %>%
+mutate( expr = log2( 1 + tpm ) ) %>%
+filter( tissue != "Liver" ) %>%
+group_by( gene ) %>%
+summarise( max = max(expr) ) -> NonLiverMaxTable
+
+NonLiverMaxTable
+```
+Nun verbinden wir die beiden Tabllen mit `left_join` und filtern auf die Zeilen, wo `expr` in Leber mehr als 2 Log2-Einheiten größer (also, mindestens 4-mal so groß vor dem `log2`) ist als `max` in der anderen Tabelle
+
+```{r echo=FALSE}
+left_join( liverOnlyTable, NonLiverMaxTable, by="gene" ) %>%
+arrange( desc( liver_expr - max ) ) %>%
+filter( liver_expr - max > 2 ) 
+```
+
+In der Vorlesung haben wir bisher immer nur Tidyverse verwendet, weil dies relativ einfach zu erlernen ist, und wir so nur eines der verschiedenen "Formen" von R lernen müssen. Allerdings ist Tidyverse zwar flexibel, aber dafür oft umständlich. Deshalb sei der Vollständigkeit halber erwähnt, dass sich die letzte Aufgabe auch mit deutlich weniger Zeilen lösen lässt, wenn man "traditionelles" R kann:
+
+```{r}
+apply( 
+  log2( 1 + tissueMedians[ , colnames(tissueMedians) != "Liver" ] ), 
+  1, max ) -> nonLiverMaxVector
+
+log2( 1 + tissueMedians[ , "Liver" ] ) - nonLiverMaxVector -> diffsToMax
+  
+sort( diffsToMax[ diffsToMax > 1 ], decreasing=TRUE ) %>% head(30)
+```
+
+
+<!-- Default Statcounter code for anders-biostat.github.io
+https://anders-biostat.github.io -->
+<script type="text/javascript">
+var sc_project=11967766; 
+var sc_invisible=1; 
+var sc_security="4f345b9a"; 
+</script>
+<script type="text/javascript"
+src="https://www.statcounter.com/counter/counter.js"
+async></script>
+<noscript><div class="statcounter"><a title="Web Analytics"
+href="https://statcounter.com/" target="_blank"><img
+class="statcounter"
+src="https://c.statcounter.com/11967766/0/4f345b9a/1/"
+alt="Web Analytics"></a></div></noscript>
+<!-- End of Statcounter Code -->
