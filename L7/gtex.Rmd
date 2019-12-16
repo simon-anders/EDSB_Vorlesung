@@ -225,7 +225,7 @@ Dieser Wert ist stes zwischen  -1 und 1.
 
 Beachte aber: "Anscombe's Quartett" -- Diese vier Beispiele haben alle den gleichen Korrelationskoeffizienten:
 
-![](https://en.wikipedia.org/wiki/File:Anscombe%27s_quartet_3.svg)
+![](https://upload.wikimedia.org/wikipedia/commons/e/ec/Anscombe%27s_quartet_3.svg)
 (Bild: Wikipedia)
 
 Zurück zu unseren Daten:
