@@ -1,0 +1,146 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <link rel="stylesheet" href="rmd_css/readable.min.css" type="text/css" />
+</head>
+<body>
+<style type="text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+<div class="main-container">
+<h3 id="vorlesung-einführung-data-science-für-biologen">Vorlesung &quot;Einführung Data Science für Biologen&quot;</h3>
+<h2 id="hinweise-zur-klausur-vorbereitung">Hinweise zur Klausur-Vorbereitung</h2>
+<p>Liebe Studierende</p>
+<p>sicher haben Sie bereits damit begonnen, sich auf die Klausur für unsere Data-Science-/Bioinformatik-Vorlesung vorzubereiten. Mir ist klar, dass das nicht ganz einfach ist, da die Vorlesung neu ist und SIe somit wenig Anhaltspunkte haben, wie so eine Klausur aussehen könnte, und zugegebenermaßen war ich mir da anfangs auch recht unsicher.</p>
+<p>Daher habe ich Ihnen im folgenden zunächst eine Liste aller Themen, die wir behandelt haben, zusammen gestellt, um den Stoff grob einzugrenzen, und dann ein paar Beispiel-Aufgaben ausformuliert.</p>
+<p>Ich hoffe, das hilft Ihnen bei der Vorbereitung.</p>
+<h3 id="inhaltsübersicht">Inhaltsübersicht</h3>
+<p>Im Folgenden habe ich eine Übersuch zusammen gestellt über die Themen, die wir in diesem Semester besprochen haben. Sie können dies als Hilfe verwenden, um zu sehen, ob Sie sich bei jedem dieser Themen in ein paar Sätzen erklären können, wie das jeweils geht.</p>
+<ul>
+<li>Arbeiten mit Tabellen in R/Tidyverse
+<ul>
+<li>Laden von Daten in Tabellen-/Matrix-Form (&quot;read_tsv&quot; etc)</li>
+<li>Zusammenfügen von Tabellen (&quot;left_join&quot; und &quot;inner_join&quot;)</li>
+<li>Ändern und Hinzufügen von Spalten mit Berechnungen (&quot;mutate&quot;)</li>
+<li>Auswählen und Filtern von Zeilen (&quot;filter&quot;)</li>
+<li>Aufteilen in Gruppen (&quot;group_by&quot;)</li>
+<li>Berechnen von Statistiken pro Gruppe (&quot;summerize&quot;)</li>
+<li>breite und lange Tabellen (&quot;spread&quot; und &quot;gather&quot;)</li>
+</ul></li>
+<li>Visualisieren von Daten mit Scatter-Plots
+<ul>
+<li>einfache Scatter-Plots (&quot;ggplot&quot; mit &quot;geom_point&quot;)</li>
+<li>zusätzliche Information durch Verwendung von Farben u.ä. (&quot;aes&quot;)</li>
+<li>Achsentransformation (z.B. logarithmische Achsen) (&quot;scale_x_log10&quot; u.ä.)</li>
+<li>Facetting: separate Plots für Untergruppen der Daten (&quot;facet_wrap&quot;)</li>
+</ul></li>
+<li>Andere Plots:
+<ul>
+<li>Histogramme und Dichte-Kurven (&quot;geom_hist&quot;, &quot;geom_density&quot;)</li>
+<li>Spezialplots, z.B. Bänder (&quot;geom_ribbon&quot;)</li>
+<li>Heatmaps (&quot;pheatmap&quot;)</li>
+</ul></li>
+<li>Inferenzielle Statistik:
+<ul>
+<li>Unsicherheit eines Schätzers (z.B. eines Mittelwerts)</li>
+<li>Standardfehler eines Mittelwerts</li>
+<li>Zentraler Grenzwertsatz und Normalverteilung</li>
+<li>Vergleichende Statistiken (zB Differenz von Mittelwerten)</li>
+<li>Permutations-Nullverteilungen</li>
+<li>t-Test als Beispiel eines parametrischen Tests</li>
+<li>p-Wert: Definition, Bedeutung, Berechnung durch Tests</li>
+<li>multiples Testen</li>
+<li>False Discovery Rate (FDR) und Benjamini-Hochberg-Korrektur</li>
+</ul></li>
+<li>RNA-Seq
+<ul>
+<li>Präprozessierung: von Sequenzier-Reads zu Count-Matrizen</li>
+<li>Differentielle Gen-Expression</li>
+<li>p-Werte und FDR bei Omics-Daten</li>
+<li>Daten-Visualisierung: MA-Plots</li>
+<li>und Gen-spezifische Plots</li>
+</ul></li>
+<li>Gene Set Enrichment Analysis
+<ul>
+<li>Konzept: wozu ist das gut?</li>
+<li>Sammlungen von Gen-Sets (GO, MSigDb, etc)</li>
+<li>Analyse mit Fisher-Tests</li>
+<li>oder mit KS-Statistik</li>
+<li>Interpretation der Ergebnisse</li>
+</ul></li>
+<li>Distanzmaße und Clustering
+<ul>
+<li>Korrelationskoeffizient als Beispiel eines Distanzmaßes</li>
+<li>Bedeutung von Homoskedastizität</li>
+<li>Transformationen zur Varianzstabilisierung</li>
+<li>Distanz-Matrizen</li>
+<li>Hierarchisches Clustering</li>
+<li>Visualisierung durch Heatmaps</li>
+<li>Interpretation von Dendrogrammen und Heatmaps</li>
+</ul></li>
+<li>RNA-Seq-Analyse mit DESeq2 o.ä.
+<ul>
+<li>Shrinkage-Estimation von Varianz und Log-fold-Change</li>
+<li>Behandlung von zusätzlichen Kovariaten (zB Geschlecht, gepaarte Proben) mit ANOVA</li>
+</ul></li>
+</ul>
+<h3 id="beispielaufgaben">Beispielaufgaben</h3>
+<h4 id="eine-aufgabe-zum-tidyverse">Eine Aufgabe zum Tidyverse</h4>
+<p>Sicherlich werde ich Aufgaben zu R/Tidyverse stellen. Für volle Punktzahl sollten Sie natürlich den korrekten R-Code angeben können, der das Problem löst. Sie werden aber auch Punkte bekommen, wenn Sie zumindest konzeptionell angeben können, wie die Tabellen umgeformt werden sollten, und welche R-Funktionen dazu verwendet werden können.</p>
+<p>Hier sind, zum Beispiel, Aufgaben, die die ersten beiden Vorlesungen zu Fragen umformulieren:</p>
+<p>In liegen Daten aus einer Gesundheits-Studie vor, bei der zufällig ausgeählte Personen untersucht werden.</p>
+<ol style="list-style-type: lower-alpha">
+<li>Ihnen liegen zwei Tabellen vor, die dieselben Personen beschreiben. Beide Tabellen haben Sie bereits in R als Tidyverse-&quot;Tibbles&quot; geladen. Die erste Tabelle, mit R-Variablennamen &quot;demogr&quot; (kurz für &quot;demographische Daten&quot;), enthält Spalten für &quot;sex&quot;, &quot;age&quot;, &quot;country_of_birth&quot; und noch einige weitere, die andere Tabelle heisst &quot;bmeas&quot; (für &quot;body measurement&quot;, d.h. &quot;Körpermaße&quot;) enthält die Spalten &quot;height&quot; (Körpergröße in cm), &quot;weight&quot; (Gewicht in kg) und &quot;waist&quot; (Bauchumfang auf Höhe des Nabels in cm). Ausserdem enthalten beide Tabellen eine Spalte &quot;subject_id&quot; mit Identifikations-Nummern, die die Probanden eindeutig aber anonymisiert identifiziert, so dass man zu einer Zeile in einer der Tabellen die zugehörige Zeile in der anderen Tabelle daran erkennen kann, dass die Subject-IDs gleich sind.</li>
+</ol>
+<p>Sie möchten die durchschnittliche Körpergröße für alle Frauen und für alle Männer berechnen. Dazu benötigen Sie eine Tabelle. in der Sie für jeden Probanden jeweils Geschlecht und Körpergröße haben. Leider liegen diese Information aber auf die beiden Tabellen verteilt vor.</p>
+<ul>
+<li><p>Mit welchem Tidyverse-Befehl können sie die beiden Tabellen zu einer zusammen fassen, und die neue Tabelle in einer Variable mit Namen &quot;big_table&quot; ablegen? Geben Sie den R-Code an, der aus den beiden Tabellen die zusammengefasste Tabelle &quot;full_table&quot; mit allen Spalten erzeugt.</p></li>
+<li><p>Macht es beim Zusammenfassen der Tabellen etwas aus, wenn die Zeilen für die Probanden in den Tabellen nicht in derselben Reihenfolge vorliegen?</p></li>
+<li><p>Zusatzfrage: Nehmen Sie an, einige Probanden fehlten in der zweiten Tabelle? Was geschieht mit diesen in der zusammengefügten Tabelle?</p></li>
+</ul>
+<ol start="2" style="list-style-type: lower-alpha">
+<li>Hier ist ein Scatter-Plot, der die Körpergröße gegen das Lebensalter aufträgt, und die Geschlechter farblich unterscheidet. Geben Sie den R-Code an, mit dem Sie diesen Plot aus der eben erstellten &quot;big_table&quot; erzeugen können.</li>
+</ol>
+<div class="figure">
+<img src="height_age.png" />
+
+</div>
+<ol start="3" style="list-style-type: lower-alpha">
+<li>Um in der nun folgenden Analyse nur die Körpergrößen erwachsener Menschen eingehen zu lassen, möchten Sie alle Probanden aus der &quot;big_table&quot; entfernen, die noch nicht 18 Jahre alt sind. Welchen R-Code könnten Sie dazu anwenden?</li>
+</ol>
+<h5 id="lösung">Lösung</h5>
+<p>Versuchen Sie, die Aufgabe auf Ihrem Computer mit R zu lösen. Wenn Sie nicht weiter kommen, spicken Sie im Material zu den ersten beiden Vorlesungen. Da ist sämtlicher Code zu finden.</p>
+<h4 id="eine-aufgabe-zur-datenvisualisierung">Eine Aufgabe zur Datenvisualisierung</h4>
+<p>Sehen Sie sich auch nochmal an, welche Plots wir zu welchen Zwecken ertsellt haben, und wie diese Aussehen. Vielleicht bitte ich Sie, einen PLot zu skizzieren.</p>
+<p>Beispiel-Aufgabe:</p>
+<p>Sie möchten zwei Histogramm der Körpergrößen von Erwachsenen erzeugen, eines für Männer und eines für Frauen.</p>
+<ul>
+<li><p>Zeichnen Sie die Histogramme, wie Sie aussehen könnten. Um zu wissen, was typische Körpergrößen für Männer und Frauen sind, verwenden Sie folgende ungefähren Daten: Der durschnittliche Mann (in Deutschland) is 1,69 m groß, die durchschnittliche Frau 1,67 m. Die Standardabweichungen sind in beiden Fällen etwa 7 cm.</p></li>
+<li><p>Geben Sie den R-Code an, der aus der &quot;big_table&quot; diese Histogramme erzeugt.</p></li>
+</ul>
+<h4 id="konzeptionelle-aufgaben">Konzeptionelle Aufgaben</h4>
+<p>Natürlich werde ich nicht nur nach R-Code fragen. Wir haben auch viele Konzepte besprochen, die man abfgaren könnte.</p>
+<p>Hier ein Beispiel, dass sich auf die letzte Vorlesung bezieht:</p>
+<p>Sie haben Gewebeproben von 10 Patienten mit eine bestimmten Hautkrankheit und von 10 gesunden Kontroll-Personen. Unter den Patienten finden sich 7 Männer und 3 Frauen, unter den gesunden Vergleichs-Personen 4 Männer und 6 Frauen. Sie führen eine RNA-Seq-Analyse durch und suchen Gene, deren Expression im Durchschnitt über alle Patienten signifikant höher ist als im Durchschnitt über all Gesunden. Ihnen fällt auf, dass viele dieser Gene auf dem Y-Chromosom liegen.</p>
+<ul>
+<li><p>Dürfen Sie daraus folgern, dass die Krankheit etwas mit dem Y-Chromosom zu tun hat? Wenn nein, was ist dann der Grund für den beobachteten Effekt?</p></li>
+<li><p>Wie könnten Sie das Problem, das hier vorliegt, beheben, ohne die Studie wiederholen zu müssen?</p></li>
+</ul>
+<h4 id="wissensfragen">Wissensfragen</h4>
+<p>Ich hoffe, Sie haben sich auch ein paar Fakten gemerkt, damit ich auch einige Wissensfragen stellen kann.</p>
+<p>Beispiel: Wie lautet die genaue Definition des &quot;p-Werts&quot;? Warum muss man für &quot;multiple Testen&quot; korrigieren, wenn man, z.B., viele Gene auf differentielle Expression testet, und welche Größe haben Benjamini und Hochberg vorgeschlagen, hier zu ermitteln?</p>
+<h3 id="noch-fragen">Noch Fragen?</h3>
+<p>Ich bin zur Zeit auf Reisen, lese aber meine E-Mails, und werde versuchen, zu antworten. Damit alle die gleichen Informationen habe, werde ich Antworten und Klarstellungen hier unten anfügen. Werfen Sie also gelegentlich einen Blick auf das Ende dieser Seite, ob es etwas Neues gibt.</p>
+<p>Die Tutoren helfen Ihnen sicher auch gerne, falls Sie mit einer Frage im 5. Stock vorbei kommen.</p>
+</div>
+</body>
+</html>
